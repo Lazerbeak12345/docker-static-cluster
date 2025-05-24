@@ -1,1 +1,5 @@
 TODO.md
+
+# python stuff
+__pycache__/
+*.py[cod]

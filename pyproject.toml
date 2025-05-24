@@ -1,0 +1,25 @@
+[project]
+name = "clustered-5s"
+version = "0.1.0"
+description = "Abstraction over Docker Swarm mode that's simpler than k8s for homelabing"
+authors = [
+    {name = "Lazerbeak12345",email = "Lazerbeak12345@users.noreply.github.com"}
+]
+license = {text = "AGPL-v3-or-later"}
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyyaml (>=6.0.2,<7.0.0)",
+    "click (>=8.2.1,<9.0.0)"
+]
+
+[project.scripts]
+clustered_5s = "clustered_5s:main"
+
+[tool.poetry]
+packages = [{include = "clustered_5s", from = "src"}]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

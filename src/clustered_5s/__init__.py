@@ -8,7 +8,8 @@ import click
 import schema
 import yaml
 
-from . import schemas
+from .schemas import config_schema
+from .cantgetno import satisfy_apps, satisfy_nodes, satisfy_resource_pools
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 
@@ -41,7 +42,7 @@ def main():
     )[0],
     type=click.File("w"),
 )
-#@click.option(
+# @click.option(
 #    "-D",
 #    "--working-dir",
 #    "--workidir",
@@ -49,7 +50,7 @@ def main():
 #    default=".",
 #    envvar="",
 #    type=click.Path(file_okay=False, dir_okay=True)
-#)
+# )
 def generate_compose(infile: TextIO, outfile: TextIO):
     """Generate a compose file for use with `docker stack`"""
     if infile.name[-5:] == ".toml":
@@ -64,10 +65,13 @@ def generate_compose(infile: TextIO, outfile: TextIO):
     else:
         raise NotImplementedError(f"File format not supported for {infile.name}")
     try:
-        config = schemas.config_schema.validate(parsed_config)
+        config = config_schema.validate(parsed_config)
     except schema.SchemaError as e:
         click.echo(f"schema error in config file {infile.name}\n{e}")
         sys.exit(1)
+    config, nodes = satisfy_nodes(config)
+    config = satisfy_apps(config)
+    config = satisfy_resource_pools(config)
     yaml.dump(config, outfile)
 
 

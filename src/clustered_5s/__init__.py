@@ -2,9 +2,13 @@
 import os
 import sys
 import tomllib
+from typing import TextIO
 
 import click
 import schema
+import yaml
+
+from . import schemas
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 
@@ -15,11 +19,7 @@ def main():
     pass
 
 
-config_schema = schema.Schema(
-    {
-        "clustered_5s_config_version": "0.0.0",
-    }
-)
+# TODO: automatic swarm state backup
 
 
 @main.command()
@@ -28,28 +28,32 @@ config_schema = schema.Schema(
     "--file",
     "--infile",
     "infile",
-    #prompt=True,
+    # prompt=True,
     default="clustered_5s.toml",
     type=click.File("rb"),
 )
 @click.option(
     "-o",
     "--outfile",
-    #prompt=True,
+    # prompt=True,
     default=lambda: os.environ.get("COMPOSE_FILE", "compose.yaml").split(
         os.environ.get("COMPOSE_PATH_SEPARATOR", ":")
     )[0],
     type=click.File("w"),
 )
-def generate_compose(infile, outfile):
+def generate_compose(infile: TextIO, outfile: TextIO):
     """Generate a compose file for use with `docker stack`"""
     try:
-        config = config_schema.validate(tomllib.load(infile))
-    except schema.SchemaError as e:
-        click.echo(f"error in config file {infile.name}\n{e}")
+        parsed_config = tomllib.load(infile)
+    except tomllib.TOMLDecodeError as e:
+        click.echo(f"parse error in config file {infile.name}\n{e}")
         sys.exit(1)
-    click.echo(config)
-    raise NotImplementedError(generate_compose)
+    try:
+        config = schemas.config_schema.validate(parsed_config)
+    except schema.SchemaError as e:
+        click.echo(f"schema error in config file {infile.name}\n{e}")
+        sys.exit(1)
+    yaml.dump(config, outfile)
 
 
 if __name__ == "__main__":

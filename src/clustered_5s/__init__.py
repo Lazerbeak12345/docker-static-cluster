@@ -41,13 +41,28 @@ def main():
     )[0],
     type=click.File("w"),
 )
+#@click.option(
+#    "-D",
+#    "--working-dir",
+#    "--workidir",
+#    "workidir",
+#    default=".",
+#    envvar="",
+#    type=click.Path(file_okay=False, dir_okay=True)
+#)
 def generate_compose(infile: TextIO, outfile: TextIO):
     """Generate a compose file for use with `docker stack`"""
-    try:
-        parsed_config = tomllib.load(infile)
-    except tomllib.TOMLDecodeError as e:
-        click.echo(f"parse error in config file {infile.name}\n{e}")
-        sys.exit(1)
+    if infile.name[-5:] == ".toml":
+        try:
+            parsed_config = tomllib.load(infile)
+        except tomllib.TOMLDecodeError as e:
+            click.echo(f"parse error in config file {infile.name}\n{e}")
+            sys.exit(1)
+    elif infile.name[-5:] == ".yaml":
+        # TODO: error handling
+        parsed_config = yaml.load(infile, yaml.Loader)
+    else:
+        raise NotImplementedError(f"File format not supported for {infile.name}")
     try:
         config = schemas.config_schema.validate(parsed_config)
     except schema.SchemaError as e:

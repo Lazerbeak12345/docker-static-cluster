@@ -9,7 +9,7 @@ import schema
 import yaml
 
 from .schemas import config_schema
-from .cantgetno import satisfy_apps, satisfy_nodes, satisfy_resource_pools
+from .cantgetno import satisfy_config
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 
@@ -21,6 +21,7 @@ def main():
 
 
 # TODO: automatic swarm state backup
+# TODO: set node state
 
 
 @main.command()
@@ -69,9 +70,7 @@ def generate_compose(infile: TextIO, outfile: TextIO):
     except schema.SchemaError as e:
         click.echo(f"schema error in config file {infile.name}\n{e}")
         sys.exit(1)
-    config, nodes = satisfy_nodes(config)
-    config = satisfy_apps(config)
-    config = satisfy_resource_pools(config)
+    nodes = satisfy_config(config, {})
     yaml.dump(config, outfile)
 
 

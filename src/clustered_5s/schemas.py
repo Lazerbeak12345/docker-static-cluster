@@ -10,7 +10,9 @@ config_features_schema = Schema(
 )
 
 config_app_schema = {
-    Optional("requires"): {str: bool},
+    Optional("features"): {
+        Optional("requires"): {str: bool},
+    },
     # per-app unique configs
     Optional(str): object,
 }
@@ -44,16 +46,20 @@ config_service_schema = Schema(
     }
 )
 
+config_node_schema = Schema(
+    {
+        "mode": Or(Schema("manager"), Schema("worker"), Schema("force-rm"))
+        # Optional("availability"): "drain"
+    }
+)
+
+config_nodes_schema = Schema({str: config_node_schema})
+
 config_schema = Schema(
     {
         # our additions
         #  A docker swarm mode node
-        Optional("nodes"): {
-            str: {
-                "mode": Or(Schema("manager"), Schema("worker"), Schema("force-rm"))
-                # Optional("availability"): "drain"
-            }
-        },
+        Optional("nodes"): config_nodes_schema,
         #  Logical applications
         Optional("apps"): {
             str: config_app_schema,

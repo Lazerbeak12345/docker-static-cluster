@@ -1,12 +1,14 @@
 import click
 from schema import Schema
+import jq
+
 from .schemas import config_schema, config_nodes_schema, config_features_schema
 
 """if true, it's been provided, and if false it's been requested but not provided"""
 tracked_features_schema = Schema({str: bool})
 
 
-def feature_requests(found: config_features_schema, so_far: tracked_features_schema):
+def feature_requires(found: config_features_schema, so_far: tracked_features_schema):
     """Given the feature schema, include requests in tracked"""
     if "requires" in found:
         requires = found["requires"]
@@ -14,7 +16,16 @@ def feature_requests(found: config_features_schema, so_far: tracked_features_sch
             if value and (key not in so_far):
                 so_far[key] = False
         del found["requires"]
-    click.echo(f"so_far {so_far}")
+
+
+def feature_provides(found: config_features_schema, so_far: tracked_features_schema):
+    """Given the feature schema, mark features as provided"""
+    if "provides" in found:
+        provides = found["provides"]
+        for key, value in provides.items():
+            if value:
+                so_far[key] = True
+        del found["provides"]
 
 
 def satisfy_apps(config: config_schema, features: tracked_features_schema):
@@ -27,9 +38,9 @@ def satisfy_apps(config: config_schema, features: tracked_features_schema):
         apps = config["apps"]
         # TODO: evaluate builtin's defaults
 
-        for name, app in apps.items():
+        for app in apps.values():
             if "features" in app:
-                feature_requests(app["features"], features)
+                feature_requires(app["features"], features)
         del config["apps"]
     return config
 
@@ -42,13 +53,28 @@ def satisfy_nodes(
         raise NotImplementedError(satisfy_nodes)
     else:
         nodes = {}
-    click.echo(f"config {config}")
     return config, nodes
 
 
 def satisfy_resource_pools(config: config_schema, features: tracked_features_schema):
     if "resource-pools" in config:
-        raise NotImplementedError(satisfy_resource_pools)
+        pools = config["resource-pools"]
+
+        # TODO: evaluate builtin's defaults
+
+        for name, pool in pools.items():
+            if "features" in pool:
+                feature_requires(pool["features"], features)
+            for cat in ("volumes", "networks", "services"):
+                if cat in pool:
+                    for v_name, volume in jq.first(
+                        pool[cat], config, cat=cat, name=name
+                    ).items():
+                        config[cat][v_name] = volume
+            if "features" in pool:
+                feature_provides(pool["features"], features)
+        del config["resource-pools"]
+    click.echo(f"config {config}")
     return config
 
 
@@ -58,4 +84,5 @@ def satisfy_config(
     satisfy_apps(config, features)
     satisfy_resource_pools(config, features)
     nodes = satisfy_nodes(config, features)
+    click.echo(f"so_far {features}")
     return nodes

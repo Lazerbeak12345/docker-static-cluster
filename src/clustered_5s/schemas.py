@@ -83,31 +83,35 @@ config_node_schema = Or(
 
 config_nodes_schema = Schema({Optional(str): config_node_schema})
 
+config_swarm_schema = Schema(
+    {
+        # https://docs.docker.com/reference/cli/docker/swarm/update/#options
+        # TODO: Optional("autolock"): bool,
+        # TODO: Optional("max-snapshots"): int,
+        # TODO: Optional("snapshot-interval"): int,
+        # TODO: Optional("task-history-limit"): int,
+        # https://docs.docker.com/reference/cli/docker/swarm/ca/
+        # TODO: Optional("ca"): {
+        # TODO: Optional("cert"): str,
+        # TODO: Optional("key"): str,
+        # TODO: Optional("cert-expiry"): str,
+        # TODO: Optional("external-ca"): [str],
+        # TODO: OUR cli may need --rotate
+        # TODO: },
+        # https://docs.docker.com/reference/cli/docker/swarm/init/
+        # TODO: Optional("autolock"): bool,
+        # TODO: Optional("default-addr-pool"): [str],
+        # TODO: Optional("default-addr-pool-mask-length"): int,
+        # TODO: Optional("dispatcher-heartbeat"): int,
+        # TODO: --force-new-cluster should be part of OUR cli
+    }
+)
+
 config_schema = Schema(
     {
         # our additions
         #  swarm mode settings (based on commands under docker swarm)
-        Optional("swarm"): {
-            # https://docs.docker.com/reference/cli/docker/swarm/update/#options
-            # TODO: Optional("autolock"): bool,
-            # TODO: Optional("max-snapshots"): int,
-            # TODO: Optional("snapshot-interval"): int,
-            # TODO: Optional("task-history-limit"): int,
-            # https://docs.docker.com/reference/cli/docker/swarm/ca/
-            # TODO: Optional("ca"): {
-            # TODO: Optional("cert"): str,
-            # TODO: Optional("key"): str,
-            # TODO: Optional("cert-expiry"): str,
-            # TODO: Optional("external-ca"): [str],
-            # TODO: OUR cli may need --rotate
-            # TODO: },
-            # https://docs.docker.com/reference/cli/docker/swarm/init/
-            # TODO: Optional("autolock"): bool,
-            # TODO: Optional("default-addr-pool"): [str],
-            # TODO: Optional("default-addr-pool-mask-length"): int,
-            # TODO: Optional("dispatcher-heartbeat"): int,
-            # TODO: --force-new-cluster should be part of OUR cli
-        },
+        Optional("swarm"): config_swarm_schema,
         #  A docker swarm mode node
         Optional("nodes"): config_nodes_schema,
         #  Logical applications

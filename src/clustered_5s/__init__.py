@@ -9,7 +9,7 @@ import schema
 import yaml
 
 from .schemas import config_schema
-from .cantgetno import satisfy_config
+from .cantgetno import satisfy_config, tracked_features_schema
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 
@@ -70,7 +70,13 @@ def generate_compose(infile: TextIO, outfile: TextIO):
     except schema.SchemaError as e:
         click.echo(f"schema error in config file {infile.name}\n{e}")
         sys.exit(1)
-    nodes = satisfy_config(config, {})
+
+    features: tracked_features_schema = {}
+    nodes, swarm = satisfy_config(config, features)
+
+    click.echo(f"nodes {nodes}")
+    click.echo(f"swarm {swarm}")
+
     yaml.dump(config, outfile)
 
 

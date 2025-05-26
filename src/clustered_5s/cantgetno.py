@@ -1,8 +1,15 @@
+import sys
+
 import click
 from schema import Schema
 import jq
 
-from .schemas import config_schema, config_nodes_schema, config_features_schema
+from .schemas import (
+    config_schema,
+    config_nodes_schema,
+    config_features_schema,
+    config_swarm_schema,
+)
 
 """if true, it's been provided, and if false it's been requested but not provided"""
 tracked_features_schema = Schema({str: bool})
@@ -55,6 +62,7 @@ def satisfy_nodes(
         nodes = {}
     return nodes
 
+
 def satisfy_swarm(
     config: config_schema, features: tracked_features_schema
 ) -> config_nodes_schema:
@@ -84,18 +92,19 @@ def satisfy_resource_pools(config: config_schema, features: tracked_features_sch
             if "features" in pool:
                 feature_provides(pool["features"], features)
         del config["resource-pools"]
-    click.echo(f"config {config}")
     return config
 
 
 def satisfy_config(
     config: config_schema, features: tracked_features_schema
-) -> config_nodes_schema:
+) -> tuple[config_nodes_schema, config_swarm_schema]:
     satisfy_apps(config, features)
     satisfy_resource_pools(config, features)
     nodes = satisfy_nodes(config, features)
     swarm = satisfy_swarm(config, features)
-    click.echo(f"features {features}")
-    click.echo(f"nodes {nodes}")
-    click.echo(f"swarm {swarm}")
+    for feature, resolved in features.items():
+        if not resolved:
+            # TODO: this isn't a very good error message
+            click.echo(f"the feature {feature} was required, but not resolved")
+            sys.exit(1)
     return nodes, swarm

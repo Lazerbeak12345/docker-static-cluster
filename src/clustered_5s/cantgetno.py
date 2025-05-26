@@ -49,11 +49,21 @@ def satisfy_nodes(
     config: config_schema, features: tracked_features_schema
 ) -> config_nodes_schema:
     if "nodes" in config:
-        nodes = config.nodes
-        raise NotImplementedError(satisfy_nodes)
+        nodes = config["nodes"]
+        del config["nodes"]
     else:
         nodes = {}
-    return config, nodes
+    return nodes
+
+def satisfy_swarm(
+    config: config_schema, features: tracked_features_schema
+) -> config_nodes_schema:
+    if "swarm" in config:
+        swarm = config["swarm"]
+        del config["swarm"]
+    else:
+        swarm = {}
+    return swarm
 
 
 def satisfy_resource_pools(config: config_schema, features: tracked_features_schema):
@@ -84,5 +94,8 @@ def satisfy_config(
     satisfy_apps(config, features)
     satisfy_resource_pools(config, features)
     nodes = satisfy_nodes(config, features)
-    click.echo(f"so_far {features}")
-    return nodes
+    swarm = satisfy_swarm(config, features)
+    click.echo(f"features {features}")
+    click.echo(f"nodes {nodes}")
+    click.echo(f"swarm {swarm}")
+    return nodes, swarm

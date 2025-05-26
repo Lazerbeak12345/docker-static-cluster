@@ -1,4 +1,10 @@
-from schema import Schema, Optional, Or
+import sys
+from typing import TextIO
+import tomllib
+
+import click
+from schema import Schema, Optional, Or, SchemaError
+import yaml
 
 jqlang_schema = Schema(str)
 
@@ -47,6 +53,9 @@ config_service_schema = Schema(
 )
 
 config_node_schema = Or(
+    # my additions
+    #  special role to remove stuff
+    Schema({"id": str, "hostname": str, "role": "force-rm", Optional(str): object}),
     Schema(
         {
             # upstream (sorta)
@@ -61,10 +70,6 @@ config_node_schema = Or(
             # "id": str,
             # "hostname": str,
             # "role": Or(Schema("manager"), Schema("worker")),
-            ## ip address?
-            ## Optional("advertise-addr"): str,
-            ## ip address?
-            ## Optional("data-path-addr"): str,
             # "platform": {
             #    # TODO: other osese
             #    # "os": Or(Schema("windows")),
@@ -76,9 +81,6 @@ config_node_schema = Or(
             # "labels": {str: str},
         }
     ),
-    # my additions
-    #  special role to remove stuff
-    Schema({"id": str, "hostname": str, "role": "force-rm"}),
 )
 
 config_nodes_schema = Schema({Optional(str): config_node_schema})
@@ -136,3 +138,24 @@ config_schema = Schema(
         Optional(str): object,
     }
 )
+
+
+def injest_config(config_file: TextIO) -> config_schema:
+    if config_file.name[-5:] == ".toml":
+        try:
+            parsed_config = tomllib.load(config_file)
+        except tomllib.TOMLDecodeError as e:
+            click.echo(f"parse error in config file {config_file.name}\n{e}")
+            sys.exit(1)
+    elif config_file.name[-5:] == ".yaml":
+        # TODO: error handling
+        parsed_config = yaml.load(config_file, yaml.Loader)
+    else:
+        raise NotImplementedError(f"File format not supported for {config_file.name}")
+    try:
+        config = config_schema.validate(parsed_config)
+    except SchemaError as e:
+        click.echo(f"schema error in config file {config_file.name}\n{e}")
+        sys.exit(1)
+
+    return config

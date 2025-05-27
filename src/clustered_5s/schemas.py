@@ -53,23 +53,42 @@ config_service_schema = Schema(
 )
 
 config_node_schema = Or(
-    # my additions
-    #  special role to remove stuff
-    Schema({"id": str, "hostname": str, "role": "force-rm", Optional(str): object}),
+    Schema(
+        {
+            # https://docs.docker.com/reference/cli/docker/node/rm/
+            "role": "rm-force",
+            Optional(str): object,
+        }
+    ),
+    Schema(
+        {
+            "availability": "drain",
+            # https://docs.docker.com/reference/cli/docker/node/rm/
+            "role": Or(Schema("rm"), Schema("rm-demote")),
+            Optional(str): object,
+        }
+    ),
     Schema(
         {
             # upstream (sorta)
             # https://docs.docker.com/reference/cli/docker/swarm/join/#options
-            # TODO: Optional("availability"): Or(
-            # TODO: Schema("active"), Schema("pause"), Schema("drain")
-            # TODO: ),
-            # TODO: Optional("advertise-addr"): str,
-            # TODO: Optional("listen-addr"): str,
-            # TODO: Optional("data-path-addr"): str,
-            # TODO: Optional("data-path-port"): str,
+            Optional("availability"): Or(
+                Schema("active"),
+                Schema("pause"),
+                Schema("drain"),
+                # TODO: default
+            ),
+            Optional("advertise-addr"): str,
+            Optional("listen-addr"): str,
+            Optional("data-path-addr"): str,
+            Optional("data-path-port"): str,
+            # https://docs.docker.com/reference/cli/docker/node/demote/
+            # https://docs.docker.com/reference/cli/docker/node/promote/
+            "role": Or(Schema("manager"), Schema("worker")),  # TODO: default
+            # https://docs.docker.com/reference/cli/docker/node/update/
+            # Optional("labels"): {str: str},
             # "id": str,
             # "hostname": str,
-            # "role": Or(Schema("manager"), Schema("worker")),
             # "platform": {
             #    # TODO: other osese
             #    # "os": Or(Schema("windows")),
@@ -77,8 +96,6 @@ config_node_schema = Or(
             #    # "arch": Or(Schema("x86_64"))
             #    "arch": str,
             # },
-            # TODO: labels
-            # "labels": {str: str},
         }
     ),
 )
@@ -88,24 +105,22 @@ config_nodes_schema = Schema({Optional(str): config_node_schema})
 config_swarm_schema = Schema(
     {
         # https://docs.docker.com/reference/cli/docker/swarm/update/#options
-        # TODO: Optional("autolock"): bool,
-        # TODO: Optional("max-snapshots"): int,
-        # TODO: Optional("snapshot-interval"): int,
-        # TODO: Optional("task-history-limit"): int,
+        Optional("autolock"): bool,
+        Optional("max-snapshots"): int,
+        Optional("snapshot-interval"): int,
+        Optional("task-history-limit"): int,
         # https://docs.docker.com/reference/cli/docker/swarm/ca/
-        # TODO: Optional("ca"): {
-        # TODO: Optional("cert"): str,
-        # TODO: Optional("key"): str,
-        # TODO: Optional("cert-expiry"): str,
-        # TODO: Optional("external-ca"): [str],
-        # TODO: OUR cli may need --rotate
-        # TODO: },
+        Optional("ca"): {
+            Optional("cert"): str,
+            Optional("key"): str,
+            Optional("cert-expiry"): str,
+            Optional("external-ca"): [str],
+        },
         # https://docs.docker.com/reference/cli/docker/swarm/init/
         # TODO: Optional("autolock"): bool,
-        # TODO: Optional("default-addr-pool"): [str],
-        # TODO: Optional("default-addr-pool-mask-length"): int,
-        # TODO: Optional("dispatcher-heartbeat"): int,
-        # TODO: --force-new-cluster should be part of OUR cli
+        Optional("default-addr-pool"): [str],
+        Optional("default-addr-pool-mask-length"): int,
+        Optional("dispatcher-heartbeat"): int,
     }
 )
 

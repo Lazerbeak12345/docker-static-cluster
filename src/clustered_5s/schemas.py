@@ -56,46 +56,30 @@ config_node_schema = Or(
     Schema(
         {
             # https://docs.docker.com/reference/cli/docker/node/rm/
-            "role": "rm-force",
-            Optional(str): object,
-        }
-    ),
-    Schema(
-        {
-            "availability": "drain",
-            # https://docs.docker.com/reference/cli/docker/node/rm/
-            "role": Or(Schema("rm"), Schema("rm-demote")),
+            "Role": Or(Schema("rm"), Schema("rm-force")),
             Optional(str): object,
         }
     ),
     Schema(
         {
             # upstream (sorta)
-            # https://docs.docker.com/reference/cli/docker/swarm/join/#options
-            Optional("availability"): Or(
+            # https://docs.docker.com/reference/cli/docker/node/demote/
+            # https://docs.docker.com/reference/cli/docker/node/promote/
+            # https://docs.docker.com/reference/cli/docker/node/update/
+            # https://docker-py.readthedocs.io/en/stable/nodes.html
+            Optional("Availability"): Or(
                 Schema("active"),
                 Schema("pause"),
                 Schema("drain"),
                 # TODO: default
             ),
-            Optional("advertise-addr"): str,
-            Optional("listen-addr"): str,
-            Optional("data-path-addr"): str,
-            Optional("data-path-port"): str,
-            # https://docs.docker.com/reference/cli/docker/node/demote/
-            # https://docs.docker.com/reference/cli/docker/node/promote/
-            "role": Or(Schema("manager"), Schema("worker")),  # TODO: default
-            # https://docs.docker.com/reference/cli/docker/node/update/
-            # Optional("labels"): {str: str},
-            # "id": str,
-            # "hostname": str,
-            # "platform": {
-            #    # TODO: other osese
-            #    # "os": Or(Schema("windows")),
-            #    "os": str,
-            #    # "arch": Or(Schema("x86_64"))
-            #    "arch": str,
-            # },
+            Optional("Name"): str,
+            "Role": Or(Schema("manager"), Schema("worker")),  # TODO: default
+            Optional("Labels"): {str: str},
+            # https://docker-py.readthedocs.io/en/stable/swarm.html?highlight=join#docker.models.swarm.Swarm.join
+            "listen_addr": str,
+            "advertise_addr": str,
+            "data_path_addr": str,
         }
     ),
 )
@@ -104,23 +88,35 @@ config_nodes_schema = Schema({Optional(str): config_node_schema})
 
 config_swarm_schema = Schema(
     {
-        # https://docs.docker.com/reference/cli/docker/swarm/update/#options
-        Optional("autolock"): bool,
-        Optional("max-snapshots"): int,
-        Optional("snapshot-interval"): int,
-        Optional("task-history-limit"): int,
-        # https://docs.docker.com/reference/cli/docker/swarm/ca/
-        Optional("ca"): {
-            Optional("cert"): str,
-            Optional("key"): str,
-            Optional("cert-expiry"): str,
-            Optional("external-ca"): [str],
+        # https://docker-py.readthedocs.io/en/stable/swarm.html#docker.models.swarm.Swarm.init
+        Optional("advertise_addr"): str,
+        Optional("listen_addr"): str,
+        Optional("default_addr_pool"): [str],
+        Optional("subnet_size"): int,
+        Optional("data_path_addr"): str,
+        Optional("data_path_port"): int,
+        Optional("task_history_retention_limit"): int,
+        Optional("snapshot_interval"): int,
+        Optional("keep_old_snapshots"): int,
+        Optional("log_entries_for_slow_followers"): int,
+        Optional("heartbeat_tick"): int,
+        Optional("election_tick"): int,
+        Optional("dispatcher_heartbeat_period"): int,
+        Optional("node_cert_expiry"): int,
+        # this CA stuff is likely broken. all of the cert
+        Optional("external_ca"): {
+            "url": str,
+            "protocol": str,
+            "options": dict,
+            Optional("ca_cert"): str,
         },
-        # https://docs.docker.com/reference/cli/docker/swarm/init/
-        # TODO: Optional("autolock"): bool,
-        Optional("default-addr-pool"): [str],
-        Optional("default-addr-pool-mask-length"): int,
-        Optional("dispatcher-heartbeat"): int,
+        Optional("name"): str,
+        Optional("labels"): {str: str},
+        Optional("signing_ca_cert"): str,
+        Optional("signing_ca_key"): str,
+        Optional("ca_force_rotate"): int,
+        Optional("autolock_managers"): bool,
+        Optional("log_driver"): {"name": str, Optional("options"): dict},
     }
 )
 

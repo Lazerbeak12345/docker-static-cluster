@@ -80,15 +80,26 @@ def satisfy_resource_pools(config: config_schema, features: tracked_features_sch
 
         # TODO: evaluate builtin's defaults
 
-        for name, pool in pools.items():
+        for pool_name, pool in pools.items():
             if "features" in pool:
                 feature_requires(pool["features"], features)
-            for cat in ("volumes", "networks", "services"):
-                if cat in pool:
-                    for v_name, volume in jq.first(
-                        pool[cat], config, cat=cat, name=name
-                    ).items():
-                        config[cat][v_name] = volume
+            for category_name in ("volumes", "networks", "services"):
+                if category_name in pool:
+                    for v_name, volume in (
+                        jq.compile(
+                            pool[category_name],
+                            args={
+                                "pool": pool_name,
+                                "is_volume": category_name == "volumes",
+                                "is_network": category_name == "networks",
+                                "is_service": category_name == "services",
+                            },
+                        )
+                        .input_value(config)
+                        .first()
+                        .items()
+                    ):
+                        config[category_name][v_name] = volume
             if "features" in pool:
                 feature_provides(pool["features"], features)
         del config["resource-pools"]

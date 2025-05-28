@@ -2,6 +2,8 @@
 import os
 from typing import TextIO
 import json
+import subprocess
+import shlex
 
 import click
 import yaml
@@ -48,10 +50,9 @@ _composefile_option = click.option(
 def generate_compose(infile: TextIO, compose_file: TextIO):
     """Generate a compose file for use with `docker stack`"""
     config = injest_config(infile)
-    nodes, swarm = satisfy_config(config, {})
-    # click.echo(f"nodes {nodes}")
+    nodes, swarm, plugins = satisfy_config(config, {})
     yaml.dump(config, compose_file)
-    return nodes, swarm
+    return nodes, swarm, plugins
 
 
 @main.command()
@@ -69,7 +70,9 @@ def generate_compose_schema(output: TextIO):
 @click.option("--skip-nodes", is_flag=True)
 @click.option("--skip-propagate-config", is_flag=True)
 @click.option("--skip-stack-deploy", is_flag=True)
+@click.pass_context
 def deploy(
+    ctx,
     infile: TextIO,
     compose_file: TextIO,
     skip_swarm: bool,
@@ -77,25 +80,65 @@ def deploy(
     skip_nodes: bool,
     skip_propagate_config: bool,
     skip_stack_deploy: bool,
+    d_client: docker.DockerClient | None = None,
 ):
     """Deploy the config file."""
-    # TODO: get config
-    raise NotImplementedError(f"{deploy} get config")
+    node_settings, swarm_settings, plugin_settings = ctx.invoke(
+        generate_compose,
+        infile=infile,
+        compose_file=compose_file,
+    )
+
+    if not d_client:
+        d_client = docker.from_env()
+
     if not skip_plugins:
-        # TODO: deploy plugins on local
-        raise NotImplementedError(f"{deploy} deploy plugins on local")
+        for plugin_name, plugin_config in plugin_settings.items():
+            try:
+                d_plugin = d_client.plugins.get(plugin_name)
+                if plugin_config["remove"]:
+                    d_plugin.remove(force=plugin_config["remove"] == "force")
+                    continue
+            except docker.errors.NotFound:
+                d_plugin = d_client.plugins.install(
+                    remote_name=plugin_config["image"],
+                    local_name=plugin_name,
+                )
+            plugin_config["name"] = plugin_name
+            d_plugin.configure(plugin_config)
+        # TODO: prune option
     if not skip_swarm:
-        # TODO: deploy swarm settings
-        raise NotImplementedError(f"{deploy} deploy swarm settings")
+        ctx.invoke(swarm_update)
     if not skip_nodes:
-        # TODO: deploy nodes
-        raise NotImplementedError(f"{deploy} deploy nodes")
+        for node_name in node_settings.keys():
+            ctx.invoke(node_update, node=node_name)
+        # TODO prune
     if not skip_propagate_config:
-        # TODO: for each node, do all of this
-        raise NotImplementedError(f"{deploy} for each node, do all of this")
+        for node_name, node_settings in node_settings.items():
+            d_node_client = docker.DockerClient(**node_settings["remote_docker_conf"])
+            ctx.invoke(
+                deploy,
+                skip_plugins=False,
+                skip_nodes=True,
+                skip_swarm=True,
+                skip_propagate_config=True,
+                skip_stack_deploy=True,
+                d_client=d_node_client,
+            )
     if not skip_stack_deploy:
-        # TODO: wrap docker stack deploy
-        raise NotImplementedError(f"{deploy} wrap docker stack deploy")
+        cmd = ["docker", "stack", "deploy"]
+
+        cmd.append("--compose-file")
+        cmd.append(compose_file.name)
+
+        # TODO prune
+
+        click.echo(f"\n$ {shlex.join(cmd)}\n")
+        subprocess.run(cmd)
+
+
+# TODO: join swarm command
+# TODO: new swarm command
 
 
 @main.group()
@@ -120,7 +163,7 @@ def swarm():
 def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
-    node, swarm = satisfy_config(config, {})
+    node, swarm, _ = satisfy_config(config, {})
 
     d_client = docker.from_env()
 
@@ -137,7 +180,7 @@ def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
 def swarm_join(infile: TextIO, node: str, token):
     """wrapper for docker swarm join"""
     config = injest_config(infile)
-    nodes, _ = satisfy_config(config, {})
+    nodes, _, _ = satisfy_config(config, {})
 
     d_client = docker.from_env()
 
@@ -172,7 +215,7 @@ def swarm_update(
 ):
     """wrapper for docker swarm update"""
     config = injest_config(infile)
-    node, swarm = satisfy_config(config, {})
+    node, swarm, _ = satisfy_config(config, {})
 
     d_client = docker.from_env()
 
@@ -209,7 +252,7 @@ def node():
 def node_update(ctx, infile: TextIO, node):
     """wrapper for docker node update"""
     config = injest_config(infile)
-    nodes, _ = satisfy_config(config, {})
+    nodes, _, _ = satisfy_config(config, {})
 
     d_client = docker.from_env()
     d_node = d_client.nodes.get(node)

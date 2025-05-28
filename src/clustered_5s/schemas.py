@@ -62,6 +62,17 @@ config_node_schema = Or(
     ),
     Schema(
         {
+            # my addons
+            Optional("remote_docker_conf"): {
+                "base_url": str,
+                Optional("version"): str,
+                Optional("timeout"): str,
+                Optional("tls"): Or(object, bool),
+                Optional("user_agent"): str,
+                Optional("credstore_env"): dict,
+                Optional("use_ssh_client"): bool,
+                Optional("max_pool_size"): int,
+            },
             # upstream (sorta)
             # https://docs.docker.com/reference/cli/docker/node/demote/
             # https://docs.docker.com/reference/cli/docker/node/promote/
@@ -120,18 +131,22 @@ config_swarm_schema = Schema(
     }
 )
 
+config_plugins_schema = Schema(
+    {
+        str: {
+            "image": str,
+            "settings": dict,
+            Optional("enabled"): bool,
+            Optional("remove"): Or(Schema("force"), bool),
+        }
+    }
+)
+
 config_schema = Schema(
     {
         # our additions
         #  Docker plugin settings
-        Optional("plugins"): {
-            str: {
-                "image": str,
-                "settings": dict,
-                Optional("enabled"): bool,
-                Optional("remove"): Or(Schema("force"), bool),
-            }
-        },
+        Optional("plugins"): config_plugins_schema,
         #  swarm mode settings (based on commands under docker swarm)
         Optional("swarm"): config_swarm_schema,
         #  A docker swarm mode node

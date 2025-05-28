@@ -9,6 +9,7 @@ from .schemas import (
     config_nodes_schema,
     config_features_schema,
     config_swarm_schema,
+    config_plugins_schema,
 )
 
 """if true, it's been provided, and if false it's been requested but not provided"""
@@ -73,6 +74,16 @@ def satisfy_swarm(
         swarm = {}
     return swarm
 
+def satisfy_plugins(
+    config: config_schema, features: tracked_features_schema
+) -> config_nodes_schema:
+    if "plugins" in config:
+        plugins = config["plugins"]
+        del config["plugins"]
+    else:
+        plugins = {}
+    return plugins
+
 
 def satisfy_jq_pools(config: config_schema, features: tracked_features_schema):
     if "jq-pools" in config:
@@ -111,12 +122,13 @@ def satisfy_jq_pools(config: config_schema, features: tracked_features_schema):
 
 def satisfy_config(
     config: config_schema, features: tracked_features_schema
-) -> tuple[config_nodes_schema, config_swarm_schema]:
+) -> tuple[config_nodes_schema, config_swarm_schema, config_plugins_schema]:
     satisfy_apps(config, features)
     # TODO: jq should be as early as possible, and it should re-validate after
     satisfy_jq_pools(config, features)
     nodes = satisfy_nodes(config, features)
     swarm = satisfy_swarm(config, features)
+    plugins = satisfy_plugins(config, features)
     for category_name in ("volumes", "networks", "services"):
         if category_name in config:
             for cat_data in config[category_name].values():
@@ -129,4 +141,4 @@ def satisfy_config(
             # TODO: this isn't a very good error message
             click.echo(f"the feature {feature} was required, but not resolved")
             sys.exit(1)
-    return nodes, swarm
+    return nodes, swarm, plugins

@@ -113,6 +113,7 @@ def satisfy_config(
     config: config_schema, features: tracked_features_schema
 ) -> tuple[config_nodes_schema, config_swarm_schema]:
     satisfy_apps(config, features)
+    # TODO: jq should be as early as possible, and it should re-validate after
     satisfy_jq_pools(config, features)
     nodes = satisfy_nodes(config, features)
     swarm = satisfy_swarm(config, features)

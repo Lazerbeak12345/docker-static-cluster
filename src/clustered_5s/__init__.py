@@ -53,11 +53,49 @@ def generate_compose(infile: TextIO, compose_file: TextIO):
     yaml.dump(config, compose_file)
     return nodes, swarm
 
+
 @main.command()
 @click.argument("output", type=click.File("w"))
 def generate_compose_schema(output: TextIO):
     """Generate the schema file for the config"""
     json.dump(config_schema.json_schema(""), output)
+
+
+@main.command()
+@_infile_option
+@_composefile_option
+@click.option("--skip-swarm", is_flag=True)
+@click.option("--skip-plugins", is_flag=True)
+@click.option("--skip-nodes", is_flag=True)
+@click.option("--skip-propagate-config", is_flag=True)
+@click.option("--skip-stack-deploy", is_flag=True)
+def deploy(
+    infile: TextIO,
+    compose_file: TextIO,
+    skip_swarm: bool,
+    skip_plugins: bool,
+    skip_nodes: bool,
+    skip_propagate_config: bool,
+    skip_stack_deploy: bool,
+):
+    """Deploy the config file."""
+    # TODO: get config
+    raise NotImplementedError(f"{deploy} get config")
+    if not skip_plugins:
+        # TODO: deploy plugins on local
+        raise NotImplementedError(f"{deploy} deploy plugins on local")
+    if not skip_swarm:
+        # TODO: deploy swarm settings
+        raise NotImplementedError(f"{deploy} deploy swarm settings")
+    if not skip_nodes:
+        # TODO: deploy nodes
+        raise NotImplementedError(f"{deploy} deploy nodes")
+    if not skip_propagate_config:
+        # TODO: for each node, do all of this
+        raise NotImplementedError(f"{deploy} for each node, do all of this")
+    if not skip_stack_deploy:
+        # TODO: wrap docker stack deploy
+        raise NotImplementedError(f"{deploy} wrap docker stack deploy")
 
 
 @main.group()

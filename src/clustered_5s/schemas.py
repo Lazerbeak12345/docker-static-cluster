@@ -75,11 +75,11 @@ config_node_schema = Or(
             ),
             Optional("Name"): str,
             "Role": Or(Schema("manager"), Schema("worker")),  # TODO: default
-            Optional("Labels"): {str: str},
+            Optional("Labels"): {str: object},
             # https://docker-py.readthedocs.io/en/stable/swarm.html?highlight=join#docker.models.swarm.Swarm.join
-            "listen_addr": str,
-            "advertise_addr": str,
-            "data_path_addr": str,
+            Optional("listen_addr"): str,
+            Optional("advertise_addr"): str,
+            Optional("data_path_addr"): str,
         }
     ),
 )
@@ -123,6 +123,15 @@ config_swarm_schema = Schema(
 config_schema = Schema(
     {
         # our additions
+        #  Docker plugin settings
+        Optional("plugins"): {
+            str: {
+                "image": str,
+                "settings": dict,
+                Optional("enabled"): bool,
+                Optional("remove"): Or(Schema("force"), bool),
+            }
+        },
         #  swarm mode settings (based on commands under docker swarm)
         Optional("swarm"): config_swarm_schema,
         #  A docker swarm mode node
@@ -132,7 +141,7 @@ config_schema = Schema(
             str: config_app_schema,
         },
         #  Use this for making swarms
-        Optional("resource-pools"): {
+        Optional("jq-pools"): {
             str: {
                 Optional("features"): config_features_schema,
                 # jqlang queries on the config file that get appended to each config

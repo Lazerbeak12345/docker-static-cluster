@@ -74,9 +74,9 @@ def satisfy_swarm(
     return swarm
 
 
-def satisfy_resource_pools(config: config_schema, features: tracked_features_schema):
-    if "resource-pools" in config:
-        pools = config["resource-pools"]
+def satisfy_jq_pools(config: config_schema, features: tracked_features_schema):
+    if "jq-pools" in config:
+        pools = config["jq-pools"]
 
         # TODO: evaluate builtin's defaults
 
@@ -93,16 +93,19 @@ def satisfy_resource_pools(config: config_schema, features: tracked_features_sch
                                 "is_volume": category_name == "volumes",
                                 "is_network": category_name == "networks",
                                 "is_service": category_name == "services",
+                                "config": config,
                             },
                         )
                         .input_value(config)
                         .first()
                         .items()
                     ):
+                        if category_name not in config:
+                            config[category_name] = {}
                         config[category_name][v_name] = volume
             if "features" in pool:
                 feature_provides(pool["features"], features)
-        del config["resource-pools"]
+        del config["jq-pools"]
     return config
 
 
@@ -110,9 +113,16 @@ def satisfy_config(
     config: config_schema, features: tracked_features_schema
 ) -> tuple[config_nodes_schema, config_swarm_schema]:
     satisfy_apps(config, features)
-    satisfy_resource_pools(config, features)
+    satisfy_jq_pools(config, features)
     nodes = satisfy_nodes(config, features)
     swarm = satisfy_swarm(config, features)
+    for category_name in ("volumes", "networks", "services"):
+        if category_name in config:
+            for cat_data in config[category_name].values():
+                if "features" in cat_data:
+                    feature_requires(cat_data["features"], features)
+                    feature_provides(cat_data["features"], features)
+                    del cat_data["features"]
     for feature, resolved in features.items():
         if not resolved:
             # TODO: this isn't a very good error message

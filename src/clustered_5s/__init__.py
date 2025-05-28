@@ -1,15 +1,13 @@
 #!/usr/bin/env python3
 import os
 from typing import TextIO
-import subprocess
-import shlex
-import sys
+import json
 
 import click
 import yaml
 import docker
 
-from .schemas import injest_config, config_nodes_schema, config_node_schema
+from .schemas import injest_config, config_schema
 from .cantgetno import satisfy_config
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
@@ -54,6 +52,12 @@ def generate_compose(infile: TextIO, compose_file: TextIO):
     # click.echo(f"nodes {nodes}")
     yaml.dump(config, compose_file)
     return nodes, swarm
+
+@main.command()
+@click.argument("output", type=click.File("w"))
+def generate_compose_schema(output: TextIO):
+    """Generate the schema file for the config"""
+    json.dump(config_schema.json_schema(""), output)
 
 
 @main.group()

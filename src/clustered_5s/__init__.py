@@ -213,8 +213,13 @@ def swarm_join(infile: TextIO, node: str, token):
             if "Status" in man_node and "Addr" in man_node["Status"]
         ]
 
-    # TODO: remove unwanted keys
-    d_client.swarm.join(join_token=token, **the_node)
+    d_client.swarm.join(
+        remote_addrs=the_node.get("remote_addrs"),
+        join_token=token,
+        listen_addr=the_node.get("listen_addr"),
+        advertise_addr=the_node.get("advertise_addr"),
+        data_path_addr=the_node.get("data_path_addr"),
+    )
 
 main.add_command(swarm_join)
 

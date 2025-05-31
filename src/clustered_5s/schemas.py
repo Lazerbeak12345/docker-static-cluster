@@ -146,9 +146,17 @@ config_schema = Schema(
         Optional("jq-pools"): {
             str: {
                 # jqlang queries on the config file that get appended to each config
-                Optional("volumes"): jqlang_schema,
-                Optional("networks"): jqlang_schema,
-                Optional("services"): jqlang_schema,
+                Optional(Or(
+                    # mine
+                    Schema("plugins"),
+                    Schema("swarm"),
+                    Schema("nodes"),
+                    Schema("stacks"),
+                    # upstream
+                    Schema("volumes"),
+                    Schema("networks"),
+                    Schema("services"),
+                )): jqlang_schema,
             }
         },
         # overridden

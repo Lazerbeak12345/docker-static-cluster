@@ -202,23 +202,35 @@ def swarm_join(infile: TextIO, node: str, token):
     """wrapper for docker swarm join"""
     config = injest_config(infile)
     nodes, _, _, _ = satisfy_config(config)
+    assert nodes
 
     d_client = docker.from_env()
 
     the_node = nodes[node]
-    if nodes:
-        the_node["remote_addrs"] = [
-            man_node["Status"]["Addr"]
-            for man_node in nodes.values()
-            if "Status" in man_node and "Addr" in man_node["Status"]
-        ]
 
-    d_client.swarm.join(
-        remote_addrs=the_node.get("remote_addrs"),
+    kwargs = {}
+
+    kwargs["remote_addrs"] = [
+        man_node["Status"]["Addr"]
+        for node_name, man_node in nodes.items()
+        if node_name != node
+        and "Status" in man_node
+        and "Addr" in man_node["Status"]
+    ]
+
+    if "Status" in the_node \
+            and "Addr" in the_node["Status"]:
+        kwargs["advertise_addr"] = the_node["Status"]["Addr"]
+
+    if "ManagerStatus" in the_node \
+            and "Addr" in the_node["ManagerStatus"]:
+        kwargs["listen_addr"] = the_node["ManagerStatus"]["Addr"]
+    if "DataPathAddr" in the_node:
+        kwargs["data_path_addr"] = the_node["DataPathAddr"]
+
+    assert d_client.swarm.join(
         join_token=token,
-        listen_addr=the_node.get("listen_addr"),
-        advertise_addr=the_node.get("advertise_addr"),
-        data_path_addr=the_node.get("data_path_addr"),
+        **kwargs
     )
 
 main.add_command(swarm_join)

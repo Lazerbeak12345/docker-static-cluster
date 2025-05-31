@@ -68,9 +68,12 @@ config_node_schema = Or(
             # https://docs.docker.com/reference/cli/docker/node/update/
             # https://docker-py.readthedocs.io/en/stable/nodes.html
             # https://docker-py.readthedocs.io/en/stable/swarm.html?highlight=join#docker.models.swarm.Swarm.join
-            Optional("listen_addr"): str,
-            #Optional("advertise_addr"): str,
-            Optional("data_path_addr"): str,
+            # upstream Swarm.join
+            Optional("DataPathAddr"): str,
+            Optional("ManagerStatus"): {
+                Optional("Addr"): str, # listen_addr
+                Optional(str): object,
+            },
             # upstream Node.attrs
             "Spec": {
                 "Availability": Or(Schema("active"), Schema('pause'), Schema('drain')),
@@ -79,7 +82,7 @@ config_node_schema = Or(
                 Optional(str): object,
             },
             Optional("Status"): {
-                Optional("Addr"): str,
+                Optional("Addr"): str, # advertise_addr
                 Optional(str): object,
             },
             Optional(str): object,

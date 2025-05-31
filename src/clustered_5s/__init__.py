@@ -58,9 +58,9 @@ _as_remote_node_option = click.option(
 def generate_compose(infile: TextIO, compose_file: TextIO):
     """Generate a compose file for use with `docker stack`"""
     config = injest_config(infile)
-    nodes, swarm, plugins = satisfy_config(config, {})
+    nodes, swarm, plugins, stack = satisfy_config(config, {})
     yaml.dump(config, compose_file)
-    return nodes, swarm, plugins
+    return nodes, swarm, plugins, stack
 
 
 @main.command()
@@ -79,6 +79,7 @@ def generate_compose_schema(output: TextIO):
 @click.option("--skip-nodes", is_flag=True)
 @click.option("--skip-propagate-config", is_flag=True)
 @click.option("--skip-stack-deploy", is_flag=True)
+@click.argument("stack_name", type=str)
 @click.pass_context
 def deploy(
     ctx,
@@ -90,9 +91,10 @@ def deploy(
     skip_nodes: bool,
     skip_propagate_config: bool,
     skip_stack_deploy: bool,
+    stack_name: str,
 ):
     """Deploy the config file."""
-    node_settings, swarm_settings, plugin_settings = ctx.invoke(
+    node_settings, swarm_settings, plugin_settings, stack_settings = ctx.invoke(
         generate_compose,
         infile=infile,
         compose_file=compose_file,
@@ -142,7 +144,7 @@ def deploy(
             sys.exit(1)
         cmd = ["docker", "stack", "deploy"]
 
-        # cmd.append(stack_name)
+        cmd.append(stack_name)
 
         cmd.append("--compose-file")
         cmd.append(compose_file.name)

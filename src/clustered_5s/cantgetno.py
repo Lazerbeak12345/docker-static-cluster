@@ -40,6 +40,8 @@ def feature_provides(found: config_features_schema, so_far: tracked_features_sch
 def satisfy_stacks(config: config_schema) -> config_stacks_schema:
     stacks = {}
     for category_name in ["volumes", "networks", "services"]:
+        if category_name not in config:
+            continue
         for thing_name, thing in config[category_name].items():
             stack_name = thing["stack"]
             if stack_name not in stacks:

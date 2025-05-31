@@ -29,6 +29,7 @@ config_volume_schema = Schema(
     {
         # our additions
         Optional("features"): config_features_schema,
+        "stack": str,
         # upstream
         Optional(str): object,
     }
@@ -38,6 +39,7 @@ config_network_schema = Schema(
     {
         # our additions
         Optional("features"): config_features_schema,
+        "stack": str,
         # upstream
         Optional(str): object,
     }
@@ -47,6 +49,7 @@ config_service_schema = Schema(
     {
         # our additions
         Optional("features"): config_features_schema,
+        "stack": str,
         # upstream
         Optional(str): object,
     }
@@ -73,6 +76,7 @@ config_node_schema = Or(
                 Optional("use_ssh_client"): bool,
                 Optional("max_pool_size"): int,
             },
+            "stack": str,
             # upstream (sorta)
             # https://docs.docker.com/reference/cli/docker/node/demote/
             # https://docs.docker.com/reference/cli/docker/node/promote/
@@ -142,6 +146,8 @@ config_plugins_schema = Schema(
     }
 )
 
+config_stacks_schema = Schema({})
+
 config_schema = Schema(
     {
         # our additions
@@ -155,6 +161,8 @@ config_schema = Schema(
         Optional("apps"): {
             str: config_app_schema,
         },
+        #  Corresponds to docker stack ls
+        Optional("stacks"): { str: config_stacks_schema },
         #  Use this for making swarms
         Optional("jq-pools"): {
             str: {

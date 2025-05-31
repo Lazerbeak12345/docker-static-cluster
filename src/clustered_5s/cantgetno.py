@@ -10,6 +10,7 @@ from .schemas import (
     config_features_schema,
     config_swarm_schema,
     config_plugins_schema,
+    config_stacks_schema,
 )
 
 """if true, it's been provided, and if false it's been requested but not provided"""
@@ -34,6 +35,17 @@ def feature_provides(found: config_features_schema, so_far: tracked_features_sch
             if value:
                 so_far[key] = True
         del found["provides"]
+
+
+def satisfy_stacks(config: config_schema) -> config_stacks_schema:
+    stacks = {}
+    for category_name in ["volumes", "networks", "services"]:
+        for thing_name, thing in config[category_name].items():
+            stack_name = thing["stack"]
+            if stack_name not in stacks:
+                stacks[stack_name] = []
+            stacks[stack_name].append(thing_name)
+            del thing["stack"]
 
 
 def satisfy_apps(config: config_schema, features: tracked_features_schema):
@@ -122,7 +134,9 @@ def satisfy_jq_pools(config: config_schema, features: tracked_features_schema):
 
 def satisfy_config(
     config: config_schema, features: tracked_features_schema
-) -> tuple[config_nodes_schema, config_swarm_schema, config_plugins_schema]:
+) -> tuple[config_nodes_schema, config_swarm_schema, config_plugins_schema, config_stacks_schema]:
+    # TODO: remove the satisfy key from each of the things that have it, and add it into the stacks object.
+    stacks = satisfy_stacks(config)
     satisfy_apps(config, features)
     # TODO: jq should be as early as possible, and it should re-validate after
     satisfy_jq_pools(config, features)
@@ -141,4 +155,4 @@ def satisfy_config(
             # TODO: this isn't a very good error message
             click.echo(f"the feature {feature} was required, but not resolved")
             sys.exit(1)
-    return nodes, swarm, plugins
+    return nodes, swarm, plugins, stacks

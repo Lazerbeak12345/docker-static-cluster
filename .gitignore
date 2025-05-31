@@ -6,3 +6,4 @@ compose.yaml
 # python stuff
 __pycache__/
 *.py[cod]
+.mypy_cache

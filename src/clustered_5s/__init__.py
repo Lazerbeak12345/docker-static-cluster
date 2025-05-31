@@ -4,6 +4,7 @@ from typing import TextIO
 import json
 import subprocess
 import shlex
+import sys
 
 import click
 import yaml
@@ -43,6 +44,13 @@ _composefile_option = click.option(
     type=click.File("w"),
 )
 
+_as_remote_node_option = click.option(
+    "-r",
+    "--as-remote-node",
+    "as_remote_node",
+    type=str,
+)
+
 
 @main.command()
 @_infile_option
@@ -65,6 +73,7 @@ def generate_compose_schema(output: TextIO):
 @main.command()
 @_infile_option
 @_composefile_option
+@_as_remote_node_option
 @click.option("--skip-swarm", is_flag=True)
 @click.option("--skip-plugins", is_flag=True)
 @click.option("--skip-nodes", is_flag=True)
@@ -75,12 +84,12 @@ def deploy(
     ctx,
     infile: TextIO,
     compose_file: TextIO,
+    as_remote_node: str|None,
     skip_swarm: bool,
     skip_plugins: bool,
     skip_nodes: bool,
     skip_propagate_config: bool,
     skip_stack_deploy: bool,
-    d_client: docker.DockerClient | None = None,
 ):
     """Deploy the config file."""
     node_settings, swarm_settings, plugin_settings = ctx.invoke(
@@ -89,7 +98,9 @@ def deploy(
         compose_file=compose_file,
     )
 
-    if not d_client:
+    if as_remote_node:
+        d_client = docker.DockerClient(**node_settings[as_remote_node]["remote_docker_conf"])
+    else:
         d_client = docker.from_env()
 
     if not skip_plugins:
@@ -107,15 +118,14 @@ def deploy(
             plugin_config["name"] = plugin_name
             d_plugin.configure(plugin_config)
         # TODO: prune option
-    if not skip_swarm:
+    if not skip_swarm and swarm_settings:
         ctx.invoke(swarm_update)
     if not skip_nodes:
         for node_name in node_settings.keys():
             ctx.invoke(node_update, node=node_name)
         # TODO prune
     if not skip_propagate_config:
-        for node_name, node_settings in node_settings.items():
-            d_node_client = docker.DockerClient(**node_settings["remote_docker_conf"])
+        for node_name in node_settings.keys():
             ctx.invoke(
                 deploy,
                 skip_plugins=False,
@@ -123,10 +133,16 @@ def deploy(
                 skip_swarm=True,
                 skip_propagate_config=True,
                 skip_stack_deploy=True,
-                d_client=d_node_client,
+                as_remote_node=node_name,
             )
     if not skip_stack_deploy:
+        if as_remote_node:
+            # TODO: support ssh
+            click.echo("Stack commands cannot be run on a remote node")
+            sys.exit(1)
         cmd = ["docker", "stack", "deploy"]
+
+        # cmd.append(stack_name)
 
         cmd.append("--compose-file")
         cmd.append(compose_file.name)
@@ -197,7 +213,6 @@ def swarm_join(infile: TextIO, node: str, token):
 
 
 @swarm.command("update")
-@click.argument("node", type=str)
 @_infile_option
 @click.pass_context
 @click.option("--force-new-cluster", is_flag=True)
@@ -208,7 +223,6 @@ def swarm_update(
     ctx,
     infile: TextIO,
     force_new_cluster: bool,
-    node: str,
     rotate_worker_token,
     rotate_manager_token,
     rotate_manager_unlock_key,
@@ -218,6 +232,8 @@ def swarm_update(
     node, swarm, _ = satisfy_config(config, {})
 
     d_client = docker.from_env()
+
+    assert d_client.swarm.attrs, "Not connected to a swarm! You need to either init or join!"
 
     # TODO: remove unwanted keys
     d_client.swarm.update(

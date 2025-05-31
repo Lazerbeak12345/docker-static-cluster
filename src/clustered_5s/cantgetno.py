@@ -1,13 +1,10 @@
-import sys
 
-import click
 from schema import Schema
 import jq
 
 from .schemas import (
     config_schema,
     config_nodes_schema,
-    config_features_schema,
     config_swarm_schema,
     config_plugins_schema,
     config_stacks_schema,
@@ -17,24 +14,6 @@ from .schemas import (
 tracked_features_schema = Schema({str: bool})
 
 
-def feature_requires(found: config_features_schema, so_far: tracked_features_schema):
-    """Given the feature schema, include requests in tracked"""
-    if "requires" in found:
-        requires = found["requires"]
-        for key, value in requires.items():
-            if value and (key not in so_far):
-                so_far[key] = False
-        del found["requires"]
-
-
-def feature_provides(found: config_features_schema, so_far: tracked_features_schema):
-    """Given the feature schema, mark features as provided"""
-    if "provides" in found:
-        provides = found["provides"]
-        for key, value in provides.items():
-            if value:
-                so_far[key] = True
-        del found["provides"]
 
 
 def satisfy_stacks(config: config_schema) -> config_stacks_schema:
@@ -48,27 +27,11 @@ def satisfy_stacks(config: config_schema) -> config_stacks_schema:
                 stacks[stack_name] = []
             stacks[stack_name].append(thing_name)
             del thing["stack"]
-
-
-def satisfy_apps(config: config_schema, features: tracked_features_schema):
-    """
-    Find the apps in the config,
-    evaluate builtin's defaults and apply user overrides
-    take resulting active feature requests and add them to the list
-    """
-    if "apps" in config:
-        apps = config["apps"]
-        # TODO: evaluate builtin's defaults
-
-        for app in apps.values():
-            if "features" in app:
-                feature_requires(app["features"], features)
-        del config["apps"]
-    return config
+    return stacks
 
 
 def satisfy_nodes(
-    config: config_schema, features: tracked_features_schema
+    config: config_schema
 ) -> config_nodes_schema:
     if "nodes" in config:
         nodes = config["nodes"]
@@ -79,7 +42,7 @@ def satisfy_nodes(
 
 
 def satisfy_swarm(
-    config: config_schema, features: tracked_features_schema
+    config: config_schema
 ) -> config_nodes_schema:
     if "swarm" in config:
         swarm = config["swarm"]
@@ -89,7 +52,7 @@ def satisfy_swarm(
     return swarm
 
 def satisfy_plugins(
-    config: config_schema, features: tracked_features_schema
+    config: config_schema
 ) -> config_nodes_schema:
     if "plugins" in config:
         plugins = config["plugins"]
@@ -99,15 +62,10 @@ def satisfy_plugins(
     return plugins
 
 
-def satisfy_jq_pools(config: config_schema, features: tracked_features_schema):
+def satisfy_jq_pools(config: config_schema):
     if "jq-pools" in config:
         pools = config["jq-pools"]
-
-        # TODO: evaluate builtin's defaults
-
         for pool_name, pool in pools.items():
-            if "features" in pool:
-                feature_requires(pool["features"], features)
             for category_name in ("volumes", "networks", "services"):
                 if category_name in pool:
                     for v_name, volume in (
@@ -128,33 +86,18 @@ def satisfy_jq_pools(config: config_schema, features: tracked_features_schema):
                         if category_name not in config:
                             config[category_name] = {}
                         config[category_name][v_name] = volume
-            if "features" in pool:
-                feature_provides(pool["features"], features)
         del config["jq-pools"]
     return config
 
 
 def satisfy_config(
-    config: config_schema, features: tracked_features_schema
+    config: config_schema
 ) -> tuple[config_nodes_schema, config_swarm_schema, config_plugins_schema, config_stacks_schema]:
     # TODO: remove the satisfy key from each of the things that have it, and add it into the stacks object.
     stacks = satisfy_stacks(config)
-    satisfy_apps(config, features)
     # TODO: jq should be as early as possible, and it should re-validate after
-    satisfy_jq_pools(config, features)
-    nodes = satisfy_nodes(config, features)
-    swarm = satisfy_swarm(config, features)
-    plugins = satisfy_plugins(config, features)
-    for category_name in ("volumes", "networks", "services"):
-        if category_name in config:
-            for cat_data in config[category_name].values():
-                if "features" in cat_data:
-                    feature_requires(cat_data["features"], features)
-                    feature_provides(cat_data["features"], features)
-                    del cat_data["features"]
-    for feature, resolved in features.items():
-        if not resolved:
-            # TODO: this isn't a very good error message
-            click.echo(f"the feature {feature} was required, but not resolved")
-            sys.exit(1)
+    satisfy_jq_pools(config)
+    nodes = satisfy_nodes(config)
+    swarm = satisfy_swarm(config)
+    plugins = satisfy_plugins(config)
     return nodes, swarm, plugins, stacks

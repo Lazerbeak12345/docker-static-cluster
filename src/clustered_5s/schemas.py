@@ -8,27 +8,12 @@ import yaml
 
 jqlang_schema = Schema(str)
 
-config_features_schema = Schema(
-    {
-        Optional("provides"): {str: bool},
-        Optional("requires"): {str: bool},
-    }
-)
-
-config_app_schema = {
-    Optional("features"): {
-        Optional("requires"): {str: bool},
-    },
-    # per-app unique configs
-    Optional(str): object,
-}
 
 # TODO: create a matrix app config
 
 config_volume_schema = Schema(
     {
         # our additions
-        Optional("features"): config_features_schema,
         "stack": str,
         # upstream
         Optional(str): object,
@@ -38,7 +23,6 @@ config_volume_schema = Schema(
 config_network_schema = Schema(
     {
         # our additions
-        Optional("features"): config_features_schema,
         "stack": str,
         # upstream
         Optional(str): object,
@@ -48,7 +32,6 @@ config_network_schema = Schema(
 config_service_schema = Schema(
     {
         # our additions
-        Optional("features"): config_features_schema,
         "stack": str,
         # upstream
         Optional(str): object,
@@ -157,16 +140,11 @@ config_schema = Schema(
         Optional("swarm"): config_swarm_schema,
         #  A docker swarm mode node
         Optional("nodes"): config_nodes_schema,
-        #  Logical applications
-        Optional("apps"): {
-            str: config_app_schema,
-        },
         #  Corresponds to docker stack ls
         Optional("stacks"): { str: config_stacks_schema },
         #  Use this for making swarms
         Optional("jq-pools"): {
             str: {
-                Optional("features"): config_features_schema,
                 # jqlang queries on the config file that get appended to each config
                 Optional("volumes"): jqlang_schema,
                 Optional("networks"): jqlang_schema,

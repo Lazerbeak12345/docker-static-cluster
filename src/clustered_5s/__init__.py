@@ -58,7 +58,7 @@ _as_remote_node_option = click.option(
 def generate_compose(infile: TextIO, compose_file: TextIO):
     """Generate a compose file for use with `docker stack`"""
     config = injest_config(infile)
-    nodes, swarm, plugins, stack = satisfy_config(config, {})
+    nodes, swarm, plugins, stack = satisfy_config(config)
     yaml.dump(config, compose_file)
     return nodes, swarm, plugins, stack
 
@@ -94,7 +94,7 @@ def deploy(
     stack_name: str,
 ):
     """Deploy the config file."""
-    node_settings, swarm_settings, plugin_settings, stack_settings = ctx.invoke(
+    node_settings, swarm_settings, plugin_settings, stacks_settings = ctx.invoke(
         generate_compose,
         infile=infile,
         compose_file=compose_file,
@@ -138,6 +138,7 @@ def deploy(
                 as_remote_node=node_name,
             )
     if not skip_stack_deploy:
+        #stack_settings = stacks_settings[stack_name]
         if as_remote_node:
             # TODO: support ssh
             click.echo("Stack commands cannot be run on a remote node")

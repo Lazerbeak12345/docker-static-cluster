@@ -14,18 +14,34 @@ from .schemas import (
 tracked_features_schema = Schema({str: bool})
 
 
+_categories = (
+    # mine
+    "plugins",
+    "swarm",
+    "nodes",
+    "stacks",
+    # upstream
+    "volumes",
+    "networks",
+    "services",
+)
+
 
 
 def satisfy_stacks(config: config_schema) -> config_stacks_schema:
     stacks = {}
-    for category_name in ["volumes", "networks", "services"]:
+    for category_name in _categories:
         if category_name not in config:
             continue
         for thing_name, thing in config[category_name].items():
+            if "stack" not in thing:
+                continue
             stack_name = thing["stack"]
             if stack_name not in stacks:
-                stacks[stack_name] = []
-            stacks[stack_name].append(thing_name)
+                stacks[stack_name] = {}
+            if category_name not in stacks[stack_name]:
+                stacks[stack_name][category_name] = []
+            stacks[stack_name][category_name].append(thing_name)
             del thing["stack"]
     return stacks
 
@@ -66,17 +82,7 @@ def satisfy_jq_pools(config: config_schema):
     if "jq-pools" in config:
         pools = config["jq-pools"]
         for pool_name, pool in pools.items():
-            for category_name in (
-                # mine
-                "plugins",
-                "swarm",
-                "nodes",
-                "stacks",
-                # upstream
-                "volumes",
-                "networks",
-                "services",
-            ):
+            for category_name in _categories:
                 if category_name not in pool:
                     continue
                 for v_name, volume in (

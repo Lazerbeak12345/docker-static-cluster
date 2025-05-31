@@ -42,8 +42,11 @@ config_node_schema = Or(
     Schema(
         {
             # https://docs.docker.com/reference/cli/docker/node/rm/
-            "Role": Or(Schema("rm"), Schema("rm-force")),
             Optional(str): object,
+            "Spec": {
+                "Role": Or(Schema("rm"), Schema("rm-force")),
+                Optional(str): object,
+            }
         }
     ),
     Schema(
@@ -59,25 +62,27 @@ config_node_schema = Or(
                 Optional("use_ssh_client"): bool,
                 Optional("max_pool_size"): int,
             },
-            "stack": str,
             # upstream (sorta)
             # https://docs.docker.com/reference/cli/docker/node/demote/
             # https://docs.docker.com/reference/cli/docker/node/promote/
             # https://docs.docker.com/reference/cli/docker/node/update/
             # https://docker-py.readthedocs.io/en/stable/nodes.html
-            Optional("Availability"): Or(
-                Schema("active"),
-                Schema("pause"),
-                Schema("drain"),
-                # TODO: default
-            ),
-            Optional("Name"): str,
-            "Role": Or(Schema("manager"), Schema("worker")),  # TODO: default
-            Optional("Labels"): {str: object},
             # https://docker-py.readthedocs.io/en/stable/swarm.html?highlight=join#docker.models.swarm.Swarm.join
             Optional("listen_addr"): str,
-            Optional("advertise_addr"): str,
+            #Optional("advertise_addr"): str,
             Optional("data_path_addr"): str,
+            # upstream Node.attrs
+            "Spec": {
+                "Availability": Or(Schema("active"), Schema('pause'), Schema('drain')),
+                "Role": Or(Schema("manager"), Schema("worker")),
+                Optional("Labels"): {str: object},
+                Optional(str): object,
+            },
+            Optional("Status"): {
+                Optional("Addr"): str,
+                Optional(str): object,
+            },
+            Optional(str): object,
         }
     ),
 )

@@ -94,7 +94,7 @@ def deploy(
     stack_name: str,
 ):
     """Deploy the config file."""
-    node_settings, swarm_settings, plugin_settings, stacks_settings = ctx.invoke(
+    node_settings, swarm_settings, plugin_settings, _ = ctx.invoke(
         generate_compose,
         infile=infile,
         compose_file=compose_file,
@@ -182,7 +182,7 @@ def swarm():
 def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
-    node, swarm, _ = satisfy_config(config, {})
+    node, swarm, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
@@ -190,6 +190,8 @@ def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
     click.echo(d_client.swarm.init(force_new_cluster=force_new_cluster, **swarm))
 
     ctx.invoke(swarm_join, node=node)
+
+main.add_command(swarm_init)
 
 
 @swarm.command("join")
@@ -199,31 +201,31 @@ def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
 def swarm_join(infile: TextIO, node: str, token):
     """wrapper for docker swarm join"""
     config = injest_config(infile)
-    nodes, _, _ = satisfy_config(config, {})
+    nodes, _, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
     the_node = nodes[node]
     if nodes:
         the_node["remote_addrs"] = [
-            man_node["advertise_addr"]
+            man_node["Status"]["Addr"]
             for man_node in nodes.values()
-            if man_node["Role"] == "manager"
+            if "Status" in man_node and "Addr" in man_node["Status"]
         ]
 
     # TODO: remove unwanted keys
     d_client.swarm.join(join_token=token, **the_node)
 
+main.add_command(swarm_join)
+
 
 @swarm.command("update")
 @_infile_option
-@click.pass_context
 @click.option("--force-new-cluster", is_flag=True)
 @click.option("--rotate-worker-token", is_flag=True)
 @click.option("--rotate-manager-token", is_flag=True)
 @click.option("--rotate-manager-unlock-key", is_flag=True)
 def swarm_update(
-    ctx,
     infile: TextIO,
     force_new_cluster: bool,
     rotate_worker_token,
@@ -232,7 +234,7 @@ def swarm_update(
 ):
     """wrapper for docker swarm update"""
     config = injest_config(infile)
-    node, swarm, _ = satisfy_config(config, {})
+    node, swarm, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
@@ -267,11 +269,10 @@ def node():
 @node.command("update")
 @_infile_option
 @click.argument("node", type=str)
-@click.pass_context
-def node_update(ctx, infile: TextIO, node):
+def node_update(infile: TextIO, node):
     """wrapper for docker node update"""
     config = injest_config(infile)
-    nodes, _, _ = satisfy_config(config, {})
+    nodes, _, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
     d_node = d_client.nodes.get(node)
@@ -280,20 +281,17 @@ def node_update(ctx, infile: TextIO, node):
     rm_force = False
 
     if not rm:
-        node_spec = nodes[node]
+        node_settings = nodes[node]
 
-        if "Role" in node_spec:
-            role = node_spec["Role"]
+        if "Role" in node_settings:
+            role = node_settings["Role"]
             rm = role in ("rm-force", "rm")
             rm_force = role == "rm-force"
-            node_spec["Role"] = "worker"
-            node_spec["Availability"] = "drain"
+            node_settings["Role"] = "worker"
+            node_settings["Availability"] = "drain"
 
         if not rm_force:
-            del node_spec["listen_addr"]
-            del node_spec["advertise_addr"]
-            del node_spec["data_path_addr"]
-            assert d_node.update(node_spec), "failed to update node"
+            assert d_node.update(node_settings["Spec"]), "failed to update node"
             d_node.reload()
     if rm:
         assert d_node.remove(force=rm_force), "failed to remove node"

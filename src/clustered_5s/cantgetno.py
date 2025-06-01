@@ -26,12 +26,13 @@ _categories = (
 def satisfy_stacks(config: Config) -> ConfigStacks:
     config_d = config.model_dump()
     stacks_d = config_d.get("stacks") or {}
-    for category_name in _categories:
+
+    for category_name in list(filter(lambda x: x!="swarm", _categories)):
         category_d = config_d[category_name]
         if not category_d:
             continue
         for thing_name, thing_d in category_d.items():
-            if "stack" not in thing_d:
+            if thing_d and "stack" not in thing_d:
                 continue
             stack_name = thing_d["stack"]
             if stack_name not in stacks_d:
@@ -48,11 +49,6 @@ def satisfy_nodes(
 ) -> ConfigNodes:
     return config.nodes or ConfigNodes({})
 
-
-def satisfy_swarm(
-    config: Config
-) -> ConfigSwarm:
-    return config.swarm or ConfigSwarm()
 
 def satisfy_plugins(
     config: Config
@@ -90,11 +86,11 @@ def satisfy_jq_pools(config: Config)->Config:
 
 def satisfy_config(
     config: Config
-) -> tuple[ConfigNodes, ConfigSwarm, ConfigPlugins, ConfigStacks]:
+) -> tuple[Config, ConfigNodes, ConfigSwarm, ConfigPlugins, ConfigStacks]:
     config = satisfy_jq_pools(config)
 
     stacks = satisfy_stacks(config)
     nodes = satisfy_nodes(config)
-    swarm = satisfy_swarm(config)
+    swarm = config.swarm
     plugins = satisfy_plugins(config)
-    return nodes, swarm, plugins, stacks
+    return config, nodes, swarm, plugins, stacks

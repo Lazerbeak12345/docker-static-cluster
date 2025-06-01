@@ -11,7 +11,7 @@ import yaml
 import docker
 import docker.errors
 
-from .schemas import injest_config, Config
+from .schemas import ConfigNode, ConfigNodeRMSpec, ConfigNodeSpec, ConfigNodeTypical, injest_config, Config
 from .cantgetno import satisfy_config
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
@@ -59,8 +59,11 @@ _as_remote_node_option = click.option(
 def generate_compose(infile: TextIO, compose_file: TextIO):
     """Generate a compose file for use with `docker stack`"""
     config = injest_config(infile)
-    nodes, swarm, plugins, stack = satisfy_config(config)
-    yaml.dump(config, compose_file)
+    config, nodes, swarm, plugins, stack = satisfy_config(config)
+    config_d = config.model_dump()
+    for key in ("plugins", "swarm", "nodes", "stacks", "jq_pools",):
+        config_d.pop(key)
+    yaml.dump(config_d, compose_file)
     return nodes, swarm, plugins, stack
 
 
@@ -95,14 +98,19 @@ def deploy(
     stack_name: str,
 ):
     """Deploy the config file."""
-    node_settings, swarm_settings, plugin_settings, _ = ctx.invoke(
+    nodes_settings, swarm_settings, plugin_settings, _ = ctx.invoke(
         generate_compose,
         infile=infile,
         compose_file=compose_file,
     )
 
     if as_remote_node:
-        d_client = docker.DockerClient(**node_settings[as_remote_node]["remote_docker_conf"])
+        node_settings = nodes_settings[as_remote_node]
+        assert node_settings, f"remote node {as_remote_node} could not be found"
+        assert node_settings.remote_docker_conf, f"remote node {as_remote_node} does not have a remote remote_docker_conf"
+        d_client = docker.DockerClient(
+            **node_settings.remote_docker_conf.model_dump()
+        )
     else:
         d_client = docker.from_env()
 
@@ -124,11 +132,11 @@ def deploy(
     if not skip_swarm and swarm_settings:
         ctx.invoke(swarm_update)
     if not skip_nodes:
-        for node_name in node_settings.keys():
+        for node_name in nodes_settings.keys():
             ctx.invoke(node_update, node=node_name)
         # TODO prune
     if not skip_propagate_config:
-        for node_name in node_settings.keys():
+        for node_name in nodes_settings.keys():
             ctx.invoke(
                 deploy,
                 skip_plugins=False,
@@ -174,6 +182,16 @@ def swarm():
     """
     pass
 
+_swarm_init_keys = (
+    "task_history_retention_limit",
+    "snapshot_interval",
+    "keep_old_snapshots",
+    "log_entries_for_slow_followers",
+    "heartbeat_tick",
+    "dispatcher_heartbeat_period",
+    "signing_ca_cert",
+    "signing_ca_key",
+)
 
 @swarm.command("init")
 @click.argument("node", type=str)
@@ -183,14 +201,21 @@ def swarm():
 def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
-    _, swarm_settings, _, _ = satisfy_config(config)
+    config, _, swarm_settings, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
-    # TODO: remove unwanted keys
+    kwargs = {}
+
+    swarm_settings_d = swarm_settings.model_dump()
+
+    for key in _swarm_init_keys:
+        if key in swarm_settings_d:
+            kwargs[key] = swarm_settings_d[key]
+
     click.echo(d_client.swarm.init(
         force_new_cluster=force_new_cluster,
-        **swarm_settings.model_dump()
+        **kwargs
     ))
 
     ctx.invoke(swarm_join, node=node)
@@ -205,7 +230,7 @@ main.add_command(swarm_init)
 def swarm_join(infile: TextIO, node: str, token):
     """wrapper for docker swarm join"""
     config = injest_config(infile)
-    nodes, _, _, _ = satisfy_config(config)
+    config, nodes, _, _, _ = satisfy_config(config)
     assert nodes
 
     d_client = docker.from_env()
@@ -242,32 +267,36 @@ main.add_command(swarm_join)
 
 @swarm.command("update")
 @_infile_option
-@click.option("--force-new-cluster", is_flag=True)
 @click.option("--rotate-worker-token", is_flag=True)
 @click.option("--rotate-manager-token", is_flag=True)
 @click.option("--rotate-manager-unlock-key", is_flag=True)
 def swarm_update(
     infile: TextIO,
-    force_new_cluster: bool,
     rotate_worker_token,
     rotate_manager_token,
     rotate_manager_unlock_key,
 ):
     """wrapper for docker swarm update"""
     config = injest_config(infile)
-    _, swarm, _, _ = satisfy_config(config)
+    config, _, swarm_settings, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
     assert d_client.swarm.attrs, "Not connected to a swarm! You need to either init or join!"
 
-    # TODO: remove unwanted keys
+    kwargs = {}
+
+    swarm_settings_d = swarm_settings.model_dump()
+
+    for key in _swarm_init_keys:
+        if key in swarm_settings_d:
+            kwargs[key] = swarm_settings_d[key]
+
     d_client.swarm.update(
-        force_new_cluster=force_new_cluster,
         rotate_worker_token=rotate_worker_token,
         rotate_manager_token=rotate_manager_token,
         rotate_manager_unlock_key=rotate_manager_unlock_key,
-        **swarm.model_dump(),
+        **kwargs
     )
 
 
@@ -293,7 +322,7 @@ def node():
 def node_update(infile: TextIO, node):
     """wrapper for docker node update"""
     config = injest_config(infile)
-    nodes, _, _, _ = satisfy_config(config)
+    config, nodes, _, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
     d_node = d_client.nodes.get(node)
@@ -302,17 +331,24 @@ def node_update(infile: TextIO, node):
     rm_force = False
 
     if not rm:
-        node_settings = nodes[node]
+        node_settings:ConfigNode = nodes[node]
 
-        if "Role" in node_settings:
-            role = node_settings["Role"]
-            rm = role in ("rm-force", "rm")
-            rm_force = role == "rm-force"
-            node_settings["Role"] = "worker"
-            node_settings["Availability"] = "drain"
+        spec = node_settings.Spec
+
+        if isinstance(spec, ConfigNodeRMSpec):
+            rm = True
+            rm_force = spec.Role == "rm-force"
+
+            node_settings = ConfigNodeTypical(
+                Spec=ConfigNodeSpec(
+                    Role="worker",
+                    Availability="drain"
+                )
+            )
+            nodes[node] = node_settings
 
         if not rm_force:
-            assert d_node.update(node_settings["Spec"]), "failed to update node"
+            assert d_node.update(node_settings.Spec.model_dump()), "failed to update node"
             d_node.reload()
     if rm:
         assert d_node.remove(force=rm_force), "failed to remove node"

@@ -132,20 +132,18 @@ class ConfigNodes(DictLikeMixin, RootModel[Dict[str, ConfigNode]]):
 class ConfigSwarm(BaseModel):
     # TODO: remove the keys in node init
     # https://docker-py.readthedocs.io/en/stable/swarm.html#docker.models.swarm.Swarm.init
-    # Optional("advertise_addr"): str,
-    # Optional("listen_addr"): str,
     # Optional("default_addr_pool"): [str],
     # Optional("subnet_size"): int,
     # Optional("data_path_addr"): str,
     # Optional("data_path_port"): int,
-    # Optional("task_history_retention_limit"): int,
-    # Optional("snapshot_interval"): int,
-    # Optional("keep_old_snapshots"): int,
-    # Optional("log_entries_for_slow_followers"): int,
-    # Optional("heartbeat_tick"): int,
-    # Optional("election_tick"): int,
-    # Optional("dispatcher_heartbeat_period"): int,
-    # Optional("node_cert_expiry"): int,
+    task_history_retention_limit: Optional[int] = None
+    snapshot_interval: Optional[int] = None
+    keep_old_snapshots: Optional[int] = None
+    log_entries_for_slow_followers: Optional[int] = None
+    heartbeat_tick: Optional[int] = None
+    election_tick: Optional[int] = None
+    dispatcher_heartbeat_period: Optional[int] = None
+    node_cert_expiry: Optional[int] = None
     # this CA stuff is likely broken. all of the cert
     #Optional("external_ca"): {
     #    "url": str,
@@ -153,10 +151,10 @@ class ConfigSwarm(BaseModel):
     #    "options": dict,
     #    Optional("ca_cert"): str,
     #},
-    # Optional("name"): str,
-    # Optional("labels"): {str: str},
-    # Optional("signing_ca_cert"): str,
-    # Optional("signing_ca_key"): str,
+    name: str
+    #labels: Optional[Dict[str, object]] = None
+    signing_ca_cert: Optional[str] = None
+    signing_ca_key: Optional[str] = None
     # Optional("ca_force_rotate"): int,
     # Optional("autolock_managers"): bool,
     # Optional("log_driver"): {"name": str, Optional("options"): dict},
@@ -203,7 +201,7 @@ class Config(BaseModel):
     #  Docker plugin settings
     plugins: Optional[ConfigPlugins] = None
     #  swarm mode settings (based on commands under docker swarm)
-    swarm: Optional[ConfigSwarm] = None
+    swarm: ConfigSwarm
     #  A docker swarm mode node
     nodes: Optional[ConfigNodes] = None
     #  Corresponds to docker stack ls
@@ -211,9 +209,9 @@ class Config(BaseModel):
     #  Use this for making swarms
     jq_pools: Optional[ConfigJQPools] = None#Field(alias="jq-pools")
     # overridden
-    volumes: Optional[ConfigVolumes] = None
-    networks: Optional[ConfigNetworks] = None
-    services: Optional[ConfigServices] = None
+    volumes: Optional[ConfigVolumes] = ConfigVolumes.model_validate({})
+    networks: Optional[ConfigNetworks] = ConfigNetworks.model_validate({})
+    services: Optional[ConfigServices] = ConfigServices.model_validate({})
     # upstream
     model_config = ConfigDict(extra='allow')
 

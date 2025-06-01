@@ -11,7 +11,14 @@ import yaml
 import docker
 import docker.errors
 
-from .schemas import ConfigNode, ConfigNodeRMSpec, ConfigNodeSpec, ConfigNodeTypical, injest_config, Config
+from .schemas import (
+    ConfigNode,
+    ConfigNodeRMSpec,
+    ConfigNodeSpec,
+    ConfigNodeTypical,
+    injest_config,
+    Config,
+)
 from .cantgetno import satisfy_config
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
@@ -61,7 +68,13 @@ def generate_compose(infile: TextIO, compose_file: TextIO):
     config = injest_config(infile)
     config, nodes, swarm, plugins, stack = satisfy_config(config)
     config_d = config.model_dump()
-    for key in ("plugins", "swarm", "nodes", "stacks", "jq_pools",):
+    for key in (
+        "plugins",
+        "swarm",
+        "nodes",
+        "stacks",
+        "jq_pools",
+    ):
         config_d.pop(key)
     yaml.dump(config_d, compose_file)
     return nodes, swarm, plugins, stack
@@ -89,7 +102,7 @@ def deploy(
     ctx,
     infile: TextIO,
     compose_file: TextIO,
-    as_remote_node: str|None,
+    as_remote_node: str | None,
     skip_swarm: bool,
     skip_plugins: bool,
     skip_nodes: bool,
@@ -107,10 +120,10 @@ def deploy(
     if as_remote_node:
         node_settings = nodes_settings[as_remote_node]
         assert node_settings, f"remote node {as_remote_node} could not be found"
-        assert node_settings.remote_docker_conf, f"remote node {as_remote_node} does not have a remote remote_docker_conf"
-        d_client = docker.DockerClient(
-            **node_settings.remote_docker_conf.model_dump()
-        )
+        assert (
+            node_settings.remote_docker_conf
+        ), f"remote node {as_remote_node} does not have a remote remote_docker_conf"
+        d_client = docker.DockerClient(**node_settings.remote_docker_conf.model_dump())
     else:
         d_client = docker.from_env()
 
@@ -147,7 +160,7 @@ def deploy(
                 as_remote_node=node_name,
             )
     if not skip_stack_deploy:
-        #stack_settings = stacks_settings[stack_name]
+        # stack_settings = stacks_settings[stack_name]
         if as_remote_node:
             # TODO: support ssh
             click.echo("Stack commands cannot be run on a remote node")
@@ -182,6 +195,7 @@ def swarm():
     """
     pass
 
+
 _swarm_init_keys = (
     "task_history_retention_limit",
     "snapshot_interval",
@@ -192,6 +206,7 @@ _swarm_init_keys = (
     "signing_ca_cert",
     "signing_ca_key",
 )
+
 
 @swarm.command("init")
 @click.argument("node", type=str)
@@ -213,12 +228,10 @@ def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
         if key in swarm_settings_d:
             kwargs[key] = swarm_settings_d[key]
 
-    click.echo(d_client.swarm.init(
-        force_new_cluster=force_new_cluster,
-        **kwargs
-    ))
+    click.echo(d_client.swarm.init(force_new_cluster=force_new_cluster, **kwargs))
 
     ctx.invoke(swarm_join, node=node)
+
 
 main.add_command(swarm_init)
 
@@ -235,32 +248,31 @@ def swarm_join(infile: TextIO, node: str, token):
 
     d_client = docker.from_env()
 
-    the_node = nodes[node]
+    the_node: ConfigNode = nodes[node]
+    assert isinstance(the_node, ConfigNodeTypical), "node must be in a typical mode"
 
     kwargs = {}
 
     kwargs["remote_addrs"] = [
-        man_node["Status"]["Addr"]
+        man_node.Status.Addr
         for node_name, man_node in nodes.items()
-        if node_name != node
-        and "Status" in man_node
-        and "Addr" in man_node["Status"]
+        if isinstance(man_node, ConfigNodeTypical)
+        and node_name != node
+        and man_node.Status
+        and man_node.Status.Addr
     ]
 
-    if "Status" in the_node \
-            and "Addr" in the_node["Status"]:
-        kwargs["advertise_addr"] = the_node["Status"]["Addr"]
+    if the_node.Status and the_node.Status.Addr:
+        kwargs["advertise_addr"] = the_node.Status.Addr
+    if the_node.ManagerStatus and the_node.ManagerStatus.Addr:
+        kwargs["listen_addr"] = the_node.ManagerStatus.Addr
+    if the_node.DataPathAddr:
+        kwargs["data_path_addr"] = the_node.DataPathAddr
 
-    if "ManagerStatus" in the_node \
-            and "Addr" in the_node["ManagerStatus"]:
-        kwargs["listen_addr"] = the_node["ManagerStatus"]["Addr"]
-    if "DataPathAddr" in the_node:
-        kwargs["data_path_addr"] = the_node["DataPathAddr"]
+    click.echo(json.dumps(kwargs))
 
-    assert d_client.swarm.join(
-        join_token=token,
-        **kwargs
-    )
+    assert d_client.swarm.join(join_token=token, **kwargs)
+
 
 main.add_command(swarm_join)
 
@@ -282,7 +294,9 @@ def swarm_update(
 
     d_client = docker.from_env()
 
-    assert d_client.swarm.attrs, "Not connected to a swarm! You need to either init or join!"
+    assert (
+        d_client.swarm.attrs
+    ), "Not connected to a swarm! You need to either init or join!"
 
     kwargs = {}
 
@@ -296,7 +310,7 @@ def swarm_update(
         rotate_worker_token=rotate_worker_token,
         rotate_manager_token=rotate_manager_token,
         rotate_manager_unlock_key=rotate_manager_unlock_key,
-        **kwargs
+        **kwargs,
     )
 
 
@@ -331,7 +345,7 @@ def node_update(infile: TextIO, node):
     rm_force = False
 
     if not rm:
-        node_settings:ConfigNode = nodes[node]
+        node_settings: ConfigNode = nodes[node]
 
         spec = node_settings.Spec
 
@@ -340,15 +354,14 @@ def node_update(infile: TextIO, node):
             rm_force = spec.Role == "rm-force"
 
             node_settings = ConfigNodeTypical(
-                Spec=ConfigNodeSpec(
-                    Role="worker",
-                    Availability="drain"
-                )
+                Spec=ConfigNodeSpec(Role="worker", Availability="drain")
             )
             nodes[node] = node_settings
 
         if not rm_force:
-            assert d_node.update(node_settings.Spec.model_dump()), "failed to update node"
+            assert d_node.update(
+                node_settings.Spec.model_dump()
+            ), "failed to update node"
             d_node.reload()
     if rm:
         assert d_node.remove(force=rm_force), "failed to remove node"

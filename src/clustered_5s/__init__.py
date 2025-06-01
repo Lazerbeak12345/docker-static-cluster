@@ -9,8 +9,9 @@ import sys
 import click
 import yaml
 import docker
+import docker.errors
 
-from .schemas import injest_config, config_schema
+from .schemas import injest_config, Config
 from .cantgetno import satisfy_config
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
@@ -67,7 +68,7 @@ def generate_compose(infile: TextIO, compose_file: TextIO):
 @click.argument("output", type=click.File("w"))
 def generate_compose_schema(output: TextIO):
     """Generate the schema file for the config"""
-    json.dump(config_schema.json_schema(""), output)
+    json.dump(Config.model_json_schema(), output)
 
 
 @main.command()
@@ -182,12 +183,15 @@ def swarm():
 def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
-    node, swarm, _, _ = satisfy_config(config)
+    _, swarm_settings, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
     # TODO: remove unwanted keys
-    click.echo(d_client.swarm.init(force_new_cluster=force_new_cluster, **swarm))
+    click.echo(d_client.swarm.init(
+        force_new_cluster=force_new_cluster,
+        **swarm_settings.model_dump()
+    ))
 
     ctx.invoke(swarm_join, node=node)
 
@@ -251,7 +255,7 @@ def swarm_update(
 ):
     """wrapper for docker swarm update"""
     config = injest_config(infile)
-    node, swarm, _, _ = satisfy_config(config)
+    _, swarm, _, _ = satisfy_config(config)
 
     d_client = docker.from_env()
 
@@ -263,7 +267,7 @@ def swarm_update(
         rotate_worker_token=rotate_worker_token,
         rotate_manager_token=rotate_manager_token,
         rotate_manager_unlock_key=rotate_manager_unlock_key,
-        **swarm,
+        **swarm.model_dump(),
     )
 
 

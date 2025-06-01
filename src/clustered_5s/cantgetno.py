@@ -1,17 +1,12 @@
-
-from schema import Schema
 import jq
 
 from .schemas import (
-    config_schema,
-    config_nodes_schema,
-    config_swarm_schema,
-    config_plugins_schema,
-    config_stacks_schema,
+    Config,
+    ConfigNodes,
+    ConfigSwarm,
+    ConfigPlugins,
+    ConfigStacks,
 )
-
-"""if true, it's been provided, and if false it's been requested but not provided"""
-tracked_features_schema = Schema({str: bool})
 
 
 _categories = (
@@ -28,59 +23,47 @@ _categories = (
 
 
 
-def satisfy_stacks(config: config_schema) -> config_stacks_schema:
-    stacks = {}
+def satisfy_stacks(config: Config) -> ConfigStacks:
+    config_d = config.model_dump()
+    stacks_d = config_d.get("stacks") or {}
     for category_name in _categories:
-        if category_name not in config:
+        category_d = config_d[category_name]
+        if not category_d:
             continue
-        for thing_name, thing in config[category_name].items():
-            if "stack" not in thing:
+        for thing_name, thing_d in category_d.items():
+            if "stack" not in thing_d:
                 continue
-            stack_name = thing["stack"]
-            if stack_name not in stacks:
-                stacks[stack_name] = {}
-            if category_name not in stacks[stack_name]:
-                stacks[stack_name][category_name] = []
-            stacks[stack_name][category_name].append(thing_name)
-            del thing["stack"]
-    return stacks
+            stack_name = thing_d["stack"]
+            if stack_name not in stacks_d:
+                stacks_d[stack_name] = {}
+            if category_name not in stacks_d[stack_name]:
+                stacks_d[stack_name][category_name] = []
+            if thing_name not in stacks_d[stack_name][category_name]:
+                stacks_d[stack_name][category_name].append(thing_name)
+    return ConfigStacks.model_validate(stacks_d)
 
 
 def satisfy_nodes(
-    config: config_schema
-) -> config_nodes_schema:
-    if "nodes" in config:
-        nodes = config["nodes"]
-        del config["nodes"]
-    else:
-        nodes = {}
-    return nodes
+    config: Config
+) -> ConfigNodes:
+    return config.nodes or ConfigNodes({})
 
 
 def satisfy_swarm(
-    config: config_schema
-) -> config_nodes_schema:
-    if "swarm" in config:
-        swarm = config["swarm"]
-        del config["swarm"]
-    else:
-        swarm = {}
-    return swarm
+    config: Config
+) -> ConfigSwarm:
+    return config.swarm or ConfigSwarm()
 
 def satisfy_plugins(
-    config: config_schema
-) -> config_nodes_schema:
-    if "plugins" in config:
-        plugins = config["plugins"]
-        del config["plugins"]
-    else:
-        plugins = {}
-    return plugins
+    config: Config
+) -> ConfigPlugins:
+    return config.plugins or ConfigPlugins({})
 
 
-def satisfy_jq_pools(config: config_schema):
-    if "jq-pools" in config:
-        pools = config["jq-pools"]
+def satisfy_jq_pools(config: Config)->Config:
+    config_d = config.model_dump()
+    if config.jq_pools:
+        pools = config.jq_pools
         for pool_name, pool in pools.items():
             for category_name in _categories:
                 if category_name not in pool:
@@ -98,17 +81,18 @@ def satisfy_jq_pools(config: config_schema):
                     .first()
                     .items()
                 ):
-                    if category_name not in config:
-                        config[category_name] = {}
-                    config[category_name][v_name] = volume
-        del config["jq-pools"]
+                    if category_name not in config_d:
+                        config_d[category_name] = {}
+                    config_d[category_name][v_name] = volume
+                    config = Config.model_validate(config_d)
     return config
 
 
 def satisfy_config(
-    config: config_schema
-) -> tuple[config_nodes_schema, config_swarm_schema, config_plugins_schema, config_stacks_schema]:
-    satisfy_jq_pools(config)
+    config: Config
+) -> tuple[ConfigNodes, ConfigSwarm, ConfigPlugins, ConfigStacks]:
+    config = satisfy_jq_pools(config)
+
     stacks = satisfy_stacks(config)
     nodes = satisfy_nodes(config)
     swarm = satisfy_swarm(config)

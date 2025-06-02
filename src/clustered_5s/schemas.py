@@ -83,7 +83,7 @@ class ConfigNodeRM(BaseModel):
     Spec: ConfigNodeRMSpec
 
 class ConfigNodeRemoteDockerConf(BaseModel):
-    base_url: str
+    base_url: Optional[str] = None
     version: Optional[str] = None
     timeout: Optional[str] = None
     tls: Optional[Union[object, bool]] = None

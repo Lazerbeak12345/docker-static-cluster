@@ -123,7 +123,14 @@ def deploy(
         assert (
             node_settings.remote_docker_conf
         ), f"remote node {as_remote_node} does not have a remote remote_docker_conf"
-        d_client = docker.DockerClient(**node_settings.remote_docker_conf.model_dump())
+        remote_docker_conf_d = node_settings.remote_docker_conf.model_dump()
+        d_client = docker.DockerClient(
+            **{
+                key: value
+                for key, value in remote_docker_conf_d.items()
+                if value is not None
+            }
+        )
     else:
         d_client = docker.from_env()
 

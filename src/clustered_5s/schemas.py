@@ -79,9 +79,6 @@ class ConfigNodeRMSpec(BaseModel):
     # upstream
     model_config = ConfigDict(extra='allow')
 
-class ConfigNodeRM(BaseModel):
-    Spec: ConfigNodeRMSpec
-
 class ConfigNodeRemoteDockerConf(BaseModel):
     base_url: Optional[str] = None
     version: Optional[str] = None
@@ -106,7 +103,7 @@ class ConfigNodeStatus(BaseModel):
     Addr: Optional[str] # advertise_addr, remote_addrs
     model_config = ConfigDict(extra='allow')
 
-class ConfigNodeTypical(BaseModel):
+class ConfigNode(BaseModel):
     # my addons
     remote_docker_conf: Optional[ConfigNodeRemoteDockerConf] = None
     # upstream (sorta)
@@ -119,12 +116,9 @@ class ConfigNodeTypical(BaseModel):
     DataPathAddr: Optional[str] = None
     ManagerStatus: Optional[ConfigNodeManagerStatus] = None
     # upstream Node.attrs
-    Spec: ConfigNodeSpec
+    Spec: Union[ConfigNodeSpec, ConfigNodeRMSpec]
     Status: Optional[ConfigNodeStatus] = None
     model_config = ConfigDict(extra='allow')
-
-ConfigNode = Union[ConfigNodeRM, ConfigNodeTypical]
-
 
 class ConfigNodes(DictLikeMixin, RootModel[Dict[str, ConfigNode]]):
     pass

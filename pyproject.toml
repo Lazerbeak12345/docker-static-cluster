@@ -23,6 +23,10 @@ clustered_5s = "clustered_5s:main"
 packages = [{include = "clustered_5s", from = "src"}]
 
 
+[tool.poetry.group.dev.dependencies]
+types-pyyaml = "^6.0.12.20250516"
+types-docker = "^7.1.0.20250523"
+
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"

@@ -15,7 +15,6 @@ from .schemas import (
     ConfigNode,
     ConfigNodeRMSpec,
     ConfigNodeSpec,
-    ConfigNodeTypical,
     injest_config,
     Config,
 )
@@ -120,9 +119,9 @@ def deploy(
     if as_remote_node:
         node_settings = nodes_settings[as_remote_node]
         assert node_settings, f"remote node {as_remote_node} could not be found"
-        assert (
-            node_settings.remote_docker_conf
-        ), f"remote node {as_remote_node} does not have a remote remote_docker_conf"
+        assert node_settings.remote_docker_conf, (
+            f"remote node {as_remote_node} does not have a remote remote_docker_conf"
+        )
         remote_docker_conf_d = node_settings.remote_docker_conf.model_dump()
         d_client = docker.DockerClient(
             **{
@@ -156,7 +155,9 @@ def deploy(
             try:
                 ctx.invoke(node_update, node=node_name)
             except docker.errors.NotFound:
-                click.echo(f"WARNING: The node {node_name} was not found to be in the swarm.")
+                click.echo(
+                    f"WARNING: The node {node_name} was not found to be in the swarm."
+                )
                 continue
         # TODO prune
     if (not skip_propagate_config) and (not skip_plugins):
@@ -260,14 +261,14 @@ def swarm_join(infile: TextIO, node: str, token):
     d_client = docker.from_env()
 
     the_node: ConfigNode = nodes[node]
-    assert isinstance(the_node, ConfigNodeTypical), "node must be in a typical mode"
+    assert isinstance(the_node, ConfigNode), "node must be in a typical mode"
 
     kwargs = {}
 
     kwargs["remote_addrs"] = [
         man_node.Status.Addr
         for node_name, man_node in nodes.items()
-        if isinstance(man_node, ConfigNodeTypical)
+        if isinstance(man_node, ConfigNode)
         and node_name != node
         and man_node.Status
         and man_node.Status.Addr
@@ -305,9 +306,9 @@ def swarm_update(
 
     d_client = docker.from_env()
 
-    assert (
-        d_client.swarm.attrs
-    ), "Not connected to a swarm! You need to either init or join!"
+    assert d_client.swarm.attrs, (
+        "Not connected to a swarm! You need to either init or join!"
+    )
 
     kwargs = {}
 
@@ -364,15 +365,12 @@ def node_update(infile: TextIO, node):
             rm = True
             rm_force = spec.Role == "rm-force"
 
-            node_settings = ConfigNodeTypical(
-                Spec=ConfigNodeSpec(Role="worker", Availability="drain")
-            )
-            nodes[node] = node_settings
+            node_settings.Spec = ConfigNodeSpec(Role="worker", Availability="drain")
 
         if not rm_force:
-            assert d_node.update(
-                node_settings.Spec.model_dump()
-            ), "failed to update node"
+            assert d_node.update(node_settings.Spec.model_dump()), (
+                "failed to update node"
+            )
             d_node.reload()
     if rm:
         assert d_node.remove(force=rm_force), "failed to remove node"

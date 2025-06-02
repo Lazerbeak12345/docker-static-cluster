@@ -103,7 +103,7 @@ class ConfigNodeSpec(BaseModel):
     model_config = ConfigDict(extra='allow')
 
 class ConfigNodeStatus(BaseModel):
-    Addr: Optional[str] # advertise_addr
+    Addr: Optional[str] # advertise_addr, remote_addrs
     model_config = ConfigDict(extra='allow')
 
 class ConfigNodeTypical(BaseModel):

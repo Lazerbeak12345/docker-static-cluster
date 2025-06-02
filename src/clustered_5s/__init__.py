@@ -146,9 +146,13 @@ def deploy(
         ctx.invoke(swarm_update)
     if not skip_nodes:
         for node_name in nodes_settings.keys():
-            ctx.invoke(node_update, node=node_name)
+            try:
+                ctx.invoke(node_update, node=node_name)
+            except docker.errors.NotFound:
+                click.echo(f"WARNING: The node {node_name} was not found to be in the swarm.")
+                continue
         # TODO prune
-    if not skip_propagate_config:
+    if (not skip_propagate_config) and (not skip_plugins):
         for node_name in nodes_settings.keys():
             ctx.invoke(
                 deploy,

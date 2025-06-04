@@ -368,6 +368,7 @@ def node_update(infile: TextIO, node):
             node_settings.Spec = ConfigNodeSpec(Role="worker", Availability="drain")
 
         if not rm_force:
+            # TODO: may need to actually promote or demote
             assert d_node.update(node_settings.Spec.model_dump()), (
                 "failed to update node"
             )
@@ -376,5 +377,16 @@ def node_update(infile: TextIO, node):
         assert d_node.remove(force=rm_force), "failed to remove node"
 
 
-if __name__ == "__main__":
-    main()
+def handle_ecxeption(exc_type, exc_value, exc_traceback):
+    try:
+        raise exc_value
+    except docker.errors.DockerException as e:
+        """ Base class for docker-py exc. """
+        # TODO: put this to stderr
+        click.echo("DockerException")
+        click.echo(e)
+    except:
+        raise
+    finally:
+        sys.exit(1)
+sys.excepthook = handle_ecxeption

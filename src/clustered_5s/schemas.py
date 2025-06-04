@@ -1,6 +1,10 @@
 import sys
 from typing import ItemsView, Iterator, KeysView, List, Literal, Union, Dict, Any, ValuesView, Optional, Generic, TypeVar
-import tomllib
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 import click
 import yaml

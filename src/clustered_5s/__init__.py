@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-from typing import TextIO
+from typing import TextIO, Optional
 import json
 import subprocess
 import shlex
@@ -101,7 +101,7 @@ def deploy(
     ctx,
     infile: TextIO,
     compose_file: TextIO,
-    as_remote_node: str | None,
+    as_remote_node: Optional[str],
     skip_swarm: bool,
     skip_plugins: bool,
     skip_nodes: bool,

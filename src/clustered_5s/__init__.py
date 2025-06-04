@@ -380,6 +380,21 @@ def node_update(infile: TextIO, node):
 def handle_ecxeption(exc_type, exc_value, exc_traceback):
     try:
         raise exc_value
+    except docker.errors.APIError as e:
+        # TODO: put this to stderr
+        click.echo(f"APIError {type(e).__name__}")
+        click.echo(json.dumps({
+            "is_client_error": e.is_client_error(),
+            "is_error": e.is_error(),
+            "is_server_error": e.is_server_error(),
+            "status_code": e.status_code,
+            "strerror": e.strerror,
+            "errno": e.errno,
+            "filename": e.filename,
+            "filename2": e.filename2,
+        }))
+        click.echo()
+        click.echo(e)
     except docker.errors.DockerException as e:
         """ Base class for docker-py exc. """
         # TODO: put this to stderr

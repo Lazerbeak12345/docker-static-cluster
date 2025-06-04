@@ -369,7 +369,11 @@ def node_update(infile: TextIO, node):
 
         if not rm_force:
             # TODO: may need to actually promote or demote
-            assert d_node.update(node_settings.Spec.model_dump()), (
+            assert d_node.update(
+                node_settings.Spec.model_dump(
+                    exclude_unset=True,
+                )
+            ), (
                 "failed to update node"
             )
             d_node.reload()

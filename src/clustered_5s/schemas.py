@@ -1,5 +1,5 @@
 import sys
-from typing import ItemsView, Iterator, KeysView, List, Literal, Union, Dict, Any, ValuesView, Optional, Generic, TypeVar
+from typing import ItemsView, Iterator, KeysView, Literal, Union, Dict, Any, ValuesView, Optional, Generic, TypeVar
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -56,7 +56,7 @@ class ConfigVolume(BaseModel):
     # upstream
     model_config = ConfigDict(extra='allow')
 
-class ConfigVolumes(DictLikeMixin, RootModel[Dict[str, ConfigVolume]]):
+class ConfigVolumes(DictLikeMixin[str, ConfigVolume], RootModel[Dict[str, ConfigVolume]]):
     pass
 
 class ConfigNetwork(BaseModel):
@@ -65,7 +65,7 @@ class ConfigNetwork(BaseModel):
     # upstream
     model_config = ConfigDict(extra='allow')
 
-class ConfigNetworks(DictLikeMixin, RootModel[Dict[str, ConfigNetwork]]):
+class ConfigNetworks(DictLikeMixin[str, ConfigNetwork], RootModel[Dict[str, ConfigNetwork]]):
     pass
 
 class ConfigService(BaseModel):
@@ -74,7 +74,7 @@ class ConfigService(BaseModel):
     # upstream
     model_config = ConfigDict(extra='allow')
 
-class ConfigServices(DictLikeMixin, RootModel[Dict[str, ConfigService]]):
+class ConfigServices(DictLikeMixin[str, ConfigService], RootModel[Dict[str, ConfigService]]):
     pass
 
 class ConfigNodeRMSpec(BaseModel):
@@ -124,7 +124,7 @@ class ConfigNode(BaseModel):
     Status: Optional[ConfigNodeStatus] = None
     model_config = ConfigDict(extra='allow')
 
-class ConfigNodes(DictLikeMixin, RootModel[Dict[str, ConfigNode]]):
+class ConfigNodes(DictLikeMixin[str, ConfigNode], RootModel[Dict[str, ConfigNode]]):
     pass
 
 class ConfigSwarm(BaseModel):
@@ -165,19 +165,7 @@ class ConfigPlugin(BaseModel):
     remove: Optional[Union[Literal["force"], bool]] = None
 
 
-class ConfigPlugins (DictLikeMixin, RootModel[Dict[str, ConfigPlugin]]):
-    pass
-
-class ConfigStack(BaseModel):
-    plugins: Optional[List[str]] = None
-    swarm: Optional[List[str]] = None
-    nodes: Optional[List[str]] = None
-    #stacks: Optional[List[str]] = None
-    volumes: Optional[List[str]] = None
-    networks: Optional[List[str]] = None
-    services: Optional[List[str]] = None
-
-class ConfigStacks (DictLikeMixin, RootModel[Dict[str, ConfigStack]]):
+class ConfigPlugins (DictLikeMixin[str, ConfigPlugin], RootModel[Dict[str, ConfigPlugin]]):
     pass
 
 class ConfigJQPool (BaseModel):
@@ -191,8 +179,22 @@ class ConfigJQPool (BaseModel):
     networks: Optional[jqlang_schema] = None
     services: Optional[jqlang_schema] = None
 
-class ConfigJQPools (DictLikeMixin, RootModel[Dict[str, ConfigJQPool]]):
+class ConfigJQPools (DictLikeMixin[str, ConfigJQPool], RootModel[Dict[str, ConfigJQPool]]):
     """ jqlang queries on the config file that get appended to each config """
+
+class ConfigStack(BaseModel):
+    # our additions
+    #  Use this for making swarms
+    jq_pools: Optional[ConfigJQPools] = ConfigJQPools.model_validate({})
+    # overridden
+    volumes: Optional[ConfigVolumes] = ConfigVolumes.model_validate({})
+    networks: Optional[ConfigNetworks] = ConfigNetworks.model_validate({})
+    services: Optional[ConfigServices] = ConfigServices.model_validate({})
+    # upstream
+    model_config = ConfigDict(extra='allow')
+
+class ConfigStacks (DictLikeMixin[str, ConfigStack], RootModel[Dict[str, ConfigStack]]):
+    pass
 
 class Config(BaseModel):
     # our additions
@@ -203,15 +205,9 @@ class Config(BaseModel):
     #  A docker swarm mode node
     nodes: Optional[ConfigNodes] = None
     #  Corresponds to docker stack ls
-    #stacks: Optional[ConfigStacks] = None
-    #  Use this for making swarms
-    jq_pools: Optional[ConfigJQPools] = None#Field(alias="jq-pools")
+    stacks: ConfigStacks = ConfigStacks.model_validate({})
     # overridden
-    volumes: Optional[ConfigVolumes] = ConfigVolumes.model_validate({})
-    networks: Optional[ConfigNetworks] = ConfigNetworks.model_validate({})
-    services: Optional[ConfigServices] = ConfigServices.model_validate({})
     # upstream
-    model_config = ConfigDict(extra='allow')
 
 
 def injest_config(config_file) -> Config:

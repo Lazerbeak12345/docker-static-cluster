@@ -16,6 +16,10 @@ from .schemas import (
     ConfigNode,
     ConfigNodeRMSpec,
     ConfigNodeSpec,
+    ConfigNodes,
+    ConfigPlugins,
+    ConfigStack,
+    ConfigSwarm,
     injest_config,
     Config,
 )
@@ -63,23 +67,20 @@ _as_remote_node_option = click.option(
 
 
 @main.command()
+@click.argument("stack_name", type=str)
 @_infile_option
 @_composefile_option
-def generate_compose(infile: TextIO, compose_file: TextIO):
+def generate_compose(
+    stack_name: str, infile: TextIO, compose_file: TextIO
+) -> tuple[Config, ConfigNodes, ConfigSwarm, ConfigPlugins, ConfigStack]:
     """Generate a compose file for use with `docker stack`"""
     config = injest_config(infile)
-    config, nodes, swarm, plugins, stack = satisfy_config(config)
-    config_d = config.model_dump()
-    for key in (
-        "plugins",
-        "swarm",
-        "nodes",
-        #"stacks",
-        "jq_pools",
-    ):
-        config_d.pop(key)
-    yaml.dump(config_d, compose_file)
-    return nodes, swarm, plugins, stack
+    config, nodes, swarm, plugins, stack = satisfy_config(config, stack_name)
+    stack_d = stack.model_dump()
+    for key in ("jq_pools",):
+        stack_d.pop(key)
+    yaml.dump(stack_d, compose_file)
+    return config, nodes, swarm, plugins, stack
 
 
 @main.command()
@@ -113,11 +114,17 @@ def deploy(
     stack_name: str,
 ):
     """Deploy the config file."""
-    nodes_settings, swarm_settings, plugin_settings, _ = ctx.invoke(
+    _, nodes_settings, swarm_settings, plugins_settings, _ = ctx.invoke(
         generate_compose,
+        stack_name=stack_name,
         infile=infile,
         compose_file=compose_file,
     )
+    assert isinstance(nodes_settings, ConfigNodes)
+    assert isinstance(swarm_settings, ConfigSwarm)
+    assert isinstance(plugins_settings, ConfigPlugins)
+
+    # TODO: something was ignoring unsupported "restart" option
 
     if as_remote_node:
         node_settings = nodes_settings[as_remote_node]
@@ -137,25 +144,26 @@ def deploy(
         d_client = docker.from_env()
 
     if not skip_plugins:
-        for plugin_name, plugin_config in plugin_settings.items():
+        for plugin_name, plugin_config in plugins_settings.items():
             try:
                 d_plugin = d_client.plugins.get(plugin_name)
-                if plugin_config["remove"]:
-                    d_plugin.remove(force=plugin_config["remove"] == "force")
+                if plugin_config.remove:
+                    d_plugin.remove(force=plugin_config.remove == "force")
                     continue
             except docker.errors.NotFound:
                 d_plugin = d_client.plugins.install(
-                    remote_name=plugin_config["image"],
+                    remote_name=plugin_config.image,
                     local_name=plugin_name,
                 )
-            plugin_config["name"] = plugin_name
+            plugin_config_d = plugin_config.model_dump()
+            plugin_config_d["name"] = plugin_name
             d_plugin.configure(plugin_config)
         # TODO: prune option
     if not skip_swarm and swarm_settings:
-        ctx.invoke(swarm_update)
+        ctx.invoke(swarm_update, stack_name=stack_name)
     if not skip_nodes:
         for node_name in nodes_settings.keys():
-            ctx.invoke(node_update, node=node_name)
+            ctx.invoke(node_update, node=node_name, stack_name=stack_name)
         # TODO prune
     if (not skip_propagate_config) and (not skip_plugins):
         for node_name in nodes_settings.keys():
@@ -167,6 +175,7 @@ def deploy(
                 skip_propagate_config=True,
                 skip_stack_deploy=True,
                 as_remote_node=node_name,
+                stack_name=stack_name,
             )
     if not skip_stack_deploy:
         # stack_settings = stacks_settings[stack_name]
@@ -219,13 +228,16 @@ _swarm_init_keys = (
 
 @swarm.command("init")
 @click.argument("node", type=str)
+@click.argument("stack_name", type=str)
 @_infile_option
 @click.pass_context
 @click.option("--force-new-cluster", is_flag=True)
-def swarm_init(ctx, infile: TextIO, force_new_cluster: bool, node: str):
+def swarm_init(
+    ctx, infile: TextIO, stack_name: str, force_new_cluster: bool, node: str
+):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
-    config, _, swarm_settings, _, _ = satisfy_config(config)
+    config, _, swarm_settings, _, _ = satisfy_config(config, stack_name)
 
     d_client = docker.from_env()
 
@@ -247,12 +259,13 @@ main.add_command(swarm_init)
 
 @swarm.command("join")
 @click.argument("node", type=str)
+@click.argument("stack_name", type=str)
 @_infile_option
 @click.option("--token", type=str)
-def swarm_join(infile: TextIO, node: str, token):
+def swarm_join(stack_name: str, infile: TextIO, node: str, token):
     """wrapper for docker swarm join"""
     config = injest_config(infile)
-    config, nodes, _, _, _ = satisfy_config(config)
+    config, nodes, _, _, _ = satisfy_config(config, stack_name)
     assert nodes
 
     d_client = docker.from_env()
@@ -287,11 +300,13 @@ main.add_command(swarm_join)
 
 
 @swarm.command("update")
+@click.argument("stack_name", type=str)
 @_infile_option
 @click.option("--rotate-worker-token", is_flag=True)
 @click.option("--rotate-manager-token", is_flag=True)
 @click.option("--rotate-manager-unlock-key", is_flag=True)
 def swarm_update(
+    stack_name: str,
     infile: TextIO,
     rotate_worker_token,
     rotate_manager_token,
@@ -299,7 +314,7 @@ def swarm_update(
 ):
     """wrapper for docker swarm update"""
     config = injest_config(infile)
-    config, _, swarm_settings, _, _ = satisfy_config(config)
+    config, _, swarm_settings, _, _ = satisfy_config(config, stack_name)
 
     d_client = docker.from_env()
 
@@ -340,12 +355,13 @@ def node():
 
 
 @node.command("update")
+@click.argument("stack_name", type=str)
 @_infile_option
 @click.argument("node", type=str)
-def node_update(infile: TextIO, node):
+def node_update(stack_name: str, infile: TextIO, node):
     """wrapper for docker node update"""
     config = injest_config(infile)
-    config, nodes, _, _, _ = satisfy_config(config)
+    config, nodes, _, _, _ = satisfy_config(config, stack_name)
 
     d_client = docker.from_env()
     d_node = d_client.nodes.get(node)
@@ -366,9 +382,7 @@ def node_update(infile: TextIO, node):
 
         if not rm_force:
             # TODO: may need to actually promote or demote
-            assert d_node.update(
-                node_settings.Spec.model_dump()
-            ), (
+            assert d_node.update(node_settings.Spec.model_dump()), (
                 "failed to update node"
             )
             d_node.reload()
@@ -385,16 +399,20 @@ def handle_ecxeption(exc_type, exc_value, exc_traceback):
         if debug:
             click.echo(traceback.format_exc())
             click.echo()
-        click.echo(json.dumps({
-            "is_client_error": e.is_client_error(),
-            "is_error": e.is_error(),
-            "is_server_error": e.is_server_error(),
-            "status_code": e.status_code,
-            "strerror": e.strerror,
-            "errno": e.errno,
-            "filename": e.filename,
-            "filename2": e.filename2,
-        }))
+        click.echo(
+            json.dumps(
+                {
+                    "is_client_error": e.is_client_error(),
+                    "is_error": e.is_error(),
+                    "is_server_error": e.is_server_error(),
+                    "status_code": e.status_code,
+                    "strerror": e.strerror,
+                    "errno": e.errno,
+                    "filename": e.filename,
+                    "filename2": e.filename2,
+                }
+            )
+        )
         click.echo()
         click.echo(e)
     except docker.errors.DockerException as e:
@@ -402,4 +420,6 @@ def handle_ecxeption(exc_type, exc_value, exc_traceback):
         # TODO: put this to stderr
         click.echo("DockerException")
         click.echo(e)
+
+
 sys.excepthook = handle_ecxeption

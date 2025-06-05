@@ -5,6 +5,7 @@ import json
 import subprocess
 import shlex
 import sys
+import traceback
 
 import click
 import yaml
@@ -19,6 +20,8 @@ from .schemas import (
     Config,
 )
 from .cantgetno import satisfy_config
+
+debug = True
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 # TODO: automatic swarm state backup
@@ -387,6 +390,9 @@ def handle_ecxeption(exc_type, exc_value, exc_traceback):
     except docker.errors.APIError as e:
         # TODO: put this to stderr
         click.echo(f"APIError {type(e).__name__}")
+        if debug:
+            click.echo(traceback.format_exc())
+            click.echo()
         click.echo(json.dumps({
             "is_client_error": e.is_client_error(),
             "is_error": e.is_error(),

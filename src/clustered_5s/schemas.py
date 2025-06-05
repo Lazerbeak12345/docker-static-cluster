@@ -98,7 +98,7 @@ class ConfigNodeManagerStatus(BaseModel):
     model_config = ConfigDict(extra='allow')
 
 class ConfigNodeSpec(BaseModel):
-    Availability: Optional[Literal["active", 'pause', 'drain']] = None
+    Availability: Optional[Literal["active", 'pause', 'drain']] = "active"
     Role: Literal["manager", "worker"]
     Labels: Optional[Dict[str, object]] = None
     model_config = ConfigDict(extra='allow')

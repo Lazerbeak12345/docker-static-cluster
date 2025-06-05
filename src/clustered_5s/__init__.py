@@ -155,13 +155,7 @@ def deploy(
         ctx.invoke(swarm_update)
     if not skip_nodes:
         for node_name in nodes_settings.keys():
-            try:
-                ctx.invoke(node_update, node=node_name)
-            except docker.errors.NotFound:
-                click.echo(
-                    f"WARNING: The node {node_name} was not found to be in the swarm."
-                )
-                continue
+            ctx.invoke(node_update, node=node_name)
         # TODO prune
     if (not skip_propagate_config) and (not skip_plugins):
         for node_name in nodes_settings.keys():
@@ -373,9 +367,7 @@ def node_update(infile: TextIO, node):
         if not rm_force:
             # TODO: may need to actually promote or demote
             assert d_node.update(
-                node_settings.Spec.model_dump(
-                    exclude_unset=True,
-                )
+                node_settings.Spec.model_dump()
             ), (
                 "failed to update node"
             )

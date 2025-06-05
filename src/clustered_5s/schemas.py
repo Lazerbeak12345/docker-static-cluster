@@ -52,7 +52,7 @@ class DictLikeMixin(Generic[K, V]):
 
 class ConfigVolume(BaseModel):
     # our additions
-    stack: str
+    #stack: Optional[str] = None
     # upstream
     model_config = ConfigDict(extra='allow')
 
@@ -61,7 +61,7 @@ class ConfigVolumes(DictLikeMixin, RootModel[Dict[str, ConfigVolume]]):
 
 class ConfigNetwork(BaseModel):
     # our additions
-    stack: str
+    #stack: Optional[str] = None
     # upstream
     model_config = ConfigDict(extra='allow')
 
@@ -70,7 +70,7 @@ class ConfigNetworks(DictLikeMixin, RootModel[Dict[str, ConfigNetwork]]):
 
 class ConfigService(BaseModel):
     # our additions
-    stack: str
+    #stack: Optional[str] = None
     # upstream
     model_config = ConfigDict(extra='allow')
 
@@ -172,7 +172,7 @@ class ConfigStack(BaseModel):
     plugins: Optional[List[str]] = None
     swarm: Optional[List[str]] = None
     nodes: Optional[List[str]] = None
-    stacks: Optional[List[str]] = None
+    #stacks: Optional[List[str]] = None
     volumes: Optional[List[str]] = None
     networks: Optional[List[str]] = None
     services: Optional[List[str]] = None
@@ -185,7 +185,7 @@ class ConfigJQPool (BaseModel):
     plugins: Optional[jqlang_schema] = None
     swarm: Optional[jqlang_schema] = None
     nodes: Optional[jqlang_schema] = None
-    stacks: Optional[jqlang_schema] = None
+    #stacks: Optional[jqlang_schema] = None
     # upstream
     volumes: Optional[jqlang_schema] = None
     networks: Optional[jqlang_schema] = None
@@ -203,7 +203,7 @@ class Config(BaseModel):
     #  A docker swarm mode node
     nodes: Optional[ConfigNodes] = None
     #  Corresponds to docker stack ls
-    stacks: Optional[ConfigStacks] = None
+    #stacks: Optional[ConfigStacks] = None
     #  Use this for making swarms
     jq_pools: Optional[ConfigJQPools] = None#Field(alias="jq-pools")
     # overridden

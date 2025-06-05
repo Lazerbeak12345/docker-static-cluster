@@ -74,7 +74,7 @@ def generate_compose(infile: TextIO, compose_file: TextIO):
         "plugins",
         "swarm",
         "nodes",
-        "stacks",
+        #"stacks",
         "jq_pools",
     ):
         config_d.pop(key)
@@ -402,8 +402,4 @@ def handle_ecxeption(exc_type, exc_value, exc_traceback):
         # TODO: put this to stderr
         click.echo("DockerException")
         click.echo(e)
-    except:
-        raise
-    finally:
-        sys.exit(1)
 sys.excepthook = handle_ecxeption

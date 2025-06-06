@@ -1,5 +1,17 @@
 import sys
-from typing import ItemsView, Iterator, KeysView, Literal, Union, Dict, Any, ValuesView, Optional, Generic, TypeVar
+from typing import (
+    ItemsView,
+    Iterator,
+    KeysView,
+    Literal,
+    Union,
+    Dict,
+    Any,
+    ValuesView,
+    Optional,
+    Generic,
+    TypeVar,
+)
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -18,70 +30,86 @@ jqlang_schema = str
 
 # TODO: create a matrix app config
 
-K = TypeVar('K')
-V = TypeVar('V')
+K = TypeVar("K")
+V = TypeVar("V")
+
+
 class DictLikeMixin(Generic[K, V]):
     root: Dict[K, V]
 
     def __getitem__(self, key: K) -> V:
         return self.root[key]
 
-    def __setitem__(self, key: K, value: V)->None:
+    def __setitem__(self, key: K, value: V) -> None:
         self.root[key] = value
 
     def __delitem__(self, key: K) -> None:
         del self.root[key]
 
-    def __iter__(self)->Iterator[K]:
+    def __iter__(self) -> Iterator[K]:
         return iter(self.root)
 
-    def __len__(self)->int:
+    def __len__(self) -> int:
         return len(self.root)
 
-    def keys(self)->KeysView[K]:
+    def keys(self) -> KeysView[K]:
         return self.root.keys()
 
-    def items(self)->ItemsView[K, V]:
+    def items(self) -> ItemsView[K, V]:
         return self.root.items()
 
-    def values(self)->ValuesView[V]:
+    def values(self) -> ValuesView[V]:
         return self.root.values()
 
-    def get(self, key:K, default:Optional[V]=None)->Optional[V]:
+    def get(self, key: K, default: Optional[V] = None) -> Optional[V]:
         return self.root.get(key, default)
+
 
 class ConfigVolume(BaseModel):
     # our additions
-    #stack: Optional[str] = None
+    # stack: Optional[str] = None
     # upstream
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
-class ConfigVolumes(DictLikeMixin[str, ConfigVolume], RootModel[Dict[str, ConfigVolume]]):
+
+class ConfigVolumes(
+    DictLikeMixin[str, ConfigVolume], RootModel[Dict[str, ConfigVolume]]
+):
     pass
+
 
 class ConfigNetwork(BaseModel):
     # our additions
-    #stack: Optional[str] = None
+    # stack: Optional[str] = None
     # upstream
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
-class ConfigNetworks(DictLikeMixin[str, ConfigNetwork], RootModel[Dict[str, ConfigNetwork]]):
+
+class ConfigNetworks(
+    DictLikeMixin[str, ConfigNetwork], RootModel[Dict[str, ConfigNetwork]]
+):
     pass
+
 
 class ConfigService(BaseModel):
     # our additions
-    #stack: Optional[str] = None
+    # stack: Optional[str] = None
     # upstream
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
-class ConfigServices(DictLikeMixin[str, ConfigService], RootModel[Dict[str, ConfigService]]):
+
+class ConfigServices(
+    DictLikeMixin[str, ConfigService], RootModel[Dict[str, ConfigService]]
+):
     pass
+
 
 class ConfigNodeRMSpec(BaseModel):
     # our additions
     Role: Literal["rm", "rm-force"]
     # upstream
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
+
 
 class ConfigNodeRemoteDockerConf(BaseModel):
     base_url: Optional[str] = None
@@ -93,19 +121,23 @@ class ConfigNodeRemoteDockerConf(BaseModel):
     use_ssh_client: Optional[bool] = None
     max_pool_size: Optional[int] = None
 
+
 class ConfigNodeManagerStatus(BaseModel):
-    Addr:Optional[str] = None # listen_addr
-    model_config = ConfigDict(extra='allow')
+    Addr: Optional[str] = None  # listen_addr
+    model_config = ConfigDict(extra="allow")
+
 
 class ConfigNodeSpec(BaseModel):
-    Availability: Optional[Literal["active", 'pause', 'drain']] = "active"
+    Availability: Optional[Literal["active", "pause", "drain"]] = "active"
     Role: Literal["manager", "worker"]
     Labels: Optional[Dict[str, object]] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
+
 
 class ConfigNodeStatus(BaseModel):
-    Addr: Optional[str] # advertise_addr, remote_addrs
-    model_config = ConfigDict(extra='allow')
+    Addr: Optional[str]  # advertise_addr, remote_addrs
+    model_config = ConfigDict(extra="allow")
+
 
 class ConfigNode(BaseModel):
     # my addons
@@ -122,10 +154,12 @@ class ConfigNode(BaseModel):
     # upstream Node.attrs
     Spec: Union[ConfigNodeSpec, ConfigNodeRMSpec]
     Status: Optional[ConfigNodeStatus] = None
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
+
 
 class ConfigNodes(DictLikeMixin[str, ConfigNode], RootModel[Dict[str, ConfigNode]]):
     pass
+
 
 class ConfigSwarm(BaseModel):
     # TODO: remove the keys in node init
@@ -143,20 +177,20 @@ class ConfigSwarm(BaseModel):
     dispatcher_heartbeat_period: Optional[int] = None
     node_cert_expiry: Optional[int] = None
     # this CA stuff is likely broken. all of the cert
-    #Optional("external_ca"): {
+    # Optional("external_ca"): {
     #    "url": str,
     #    "protocol": str,
     #    "options": dict,
     #    Optional("ca_cert"): str,
-    #},
-    name: str
-    #labels: Optional[Dict[str, object]] = None
+    # },
+    # name: str
+    # labels: Optional[Dict[str, object]] = None
     signing_ca_cert: Optional[str] = None
     signing_ca_key: Optional[str] = None
     # Optional("ca_force_rotate"): int,
     # Optional("autolock_managers"): bool,
     # Optional("log_driver"): {"name": str, Optional("options"): dict},
-    pass
+
 
 class ConfigPlugin(BaseModel):
     image: str
@@ -165,22 +199,29 @@ class ConfigPlugin(BaseModel):
     remove: Optional[Union[Literal["force"], bool]] = None
 
 
-class ConfigPlugins (DictLikeMixin[str, ConfigPlugin], RootModel[Dict[str, ConfigPlugin]]):
+class ConfigPlugins(
+    DictLikeMixin[str, ConfigPlugin], RootModel[Dict[str, ConfigPlugin]]
+):
     pass
 
-class ConfigJQPool (BaseModel):
+
+class ConfigJQPool(BaseModel):
     # mine
     plugins: Optional[jqlang_schema] = None
     swarm: Optional[jqlang_schema] = None
     nodes: Optional[jqlang_schema] = None
-    #stacks: Optional[jqlang_schema] = None
+    # stacks: Optional[jqlang_schema] = None
     # upstream
     volumes: Optional[jqlang_schema] = None
     networks: Optional[jqlang_schema] = None
     services: Optional[jqlang_schema] = None
 
-class ConfigJQPools (DictLikeMixin[str, ConfigJQPool], RootModel[Dict[str, ConfigJQPool]]):
-    """ jqlang queries on the config file that get appended to each config """
+
+class ConfigJQPools(
+    DictLikeMixin[str, ConfigJQPool], RootModel[Dict[str, ConfigJQPool]]
+):
+    """jqlang queries on the config file that get appended to each config"""
+
 
 class ConfigStack(BaseModel):
     # our additions
@@ -191,10 +232,12 @@ class ConfigStack(BaseModel):
     networks: Optional[ConfigNetworks] = ConfigNetworks.model_validate({})
     services: Optional[ConfigServices] = ConfigServices.model_validate({})
     # upstream
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra="allow")
 
-class ConfigStacks (DictLikeMixin[str, ConfigStack], RootModel[Dict[str, ConfigStack]]):
+
+class ConfigStacks(DictLikeMixin[str, ConfigStack], RootModel[Dict[str, ConfigStack]]):
     pass
+
 
 class Config(BaseModel):
     # our additions

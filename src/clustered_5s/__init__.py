@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-from typing import TextIO, Optional
+from typing import Dict, TextIO, Optional
 import json
 import subprocess
 import shlex
@@ -227,13 +227,15 @@ _swarm_init_keys = (
 
 
 @swarm.command("init")
-@click.argument("node", type=str)
+# @click.argument("node", type=str)
 @click.argument("stack_name", type=str)
 @_infile_option
-@click.pass_context
+# @click.pass_context
 @click.option("--force-new-cluster", is_flag=True)
 def swarm_init(
-    ctx, infile: TextIO, stack_name: str, force_new_cluster: bool, node: str
+    infile: TextIO,
+    stack_name: str,
+    force_new_cluster: bool,  # , node: str
 ):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
@@ -251,7 +253,7 @@ def swarm_init(
 
     click.echo(d_client.swarm.init(force_new_cluster=force_new_cluster, **kwargs))
 
-    ctx.invoke(swarm_join, node=node)
+    # ctx.invoke(swarm_join, node=node, stack_name=stack_name)
 
 
 main.add_command(swarm_init)
@@ -266,14 +268,12 @@ def swarm_join(stack_name: str, infile: TextIO, node: str, token):
     """wrapper for docker swarm join"""
     config = injest_config(infile)
     config, nodes, _, _, _ = satisfy_config(config, stack_name)
-    assert nodes
 
     d_client = docker.from_env()
 
-    the_node: ConfigNode = nodes[node]
-    assert isinstance(the_node, ConfigNode), "node must be in a typical mode"
+    the_node = nodes[node]
 
-    kwargs = {}
+    kwargs: Dict[str, object] = {}
 
     kwargs["remote_addrs"] = [
         man_node.Status.Addr
@@ -364,7 +364,14 @@ def node_update(stack_name: str, infile: TextIO, node):
     config, nodes, _, _, _ = satisfy_config(config, stack_name)
 
     d_client = docker.from_env()
-    d_node = d_client.nodes.get(node)
+    try:
+        d_node = d_client.nodes.get(node)
+    except docker.errors.APIError as e:
+        if e.status_code == 404:
+            click.echo(f"node {node} was already removed")
+            return
+        else:
+            raise e
 
     rm = node not in nodes
     rm_force = False

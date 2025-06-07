@@ -1,11 +1,16 @@
+# SPDX-FileCopyrightText: 2025 2025
+# SPDX-FileContributor: Nathan Fritzler
+#
+# SPDX-License-Identifier: MIT
+
 [project]
-name = "clustered-5s"
+name = "docker-static-cluster"
 version = "0.1.0"
 description = "Abstraction over Docker Swarm mode that's simpler than k8s for homelabing"
 authors = [
     {name = "Lazerbeak12345",email = "Lazerbeak12345@users.noreply.github.com"}
 ]
-license = {text = "AGPL-v3-or-later"}
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.9"
 dependencies = [
@@ -20,10 +25,11 @@ dependencies = [
 ]
 
 [project.scripts]
-clustered_5s = "clustered_5s:main"
+docker_static_cluster = "docker_static_cluster:main"
+docker_sc = "docker_static_cluster:main"
 
 [tool.poetry]
-packages = [{include = "clustered_5s", from = "src"}]
+packages = [{include = "docker_static_cluster", from = "src"}]
 
 
 [tool.poetry.group.dev.dependencies]

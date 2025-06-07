@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2025 2025
+# SPDX-FileContributor: Nathan Fritzler
+#
+# SPDX-License-Identifier: MIT
+
 import os
 from typing import Dict, List, TextIO, Optional
 import json
@@ -49,7 +55,7 @@ _infile_option = click.option(
     "--infile",
     "infile",
     # prompt=True,
-    default="clustered_5s.toml",
+    default="docker_static_cluster.toml",
     type=click.File("rb"),
 )
 
@@ -191,8 +197,7 @@ def deploy(
         # stack_settings = stacks_settings[stack_name]
         if as_remote_node:
             # TODO: support ssh
-            click.echo("Stack commands cannot be run on a remote node")
-            sys.exit(1)
+            raise NotImplementedError("Stack commands cannot be run on a remote node")
         # NOTE: below doesn't do things the right way
         #
         # cmd = ["docker"]
@@ -208,6 +213,12 @@ def deploy(
 
         run_cmd(cmd)
     if force_service_update:
+        if as_remote_node:
+            # TODO: support ssh
+            raise NotImplementedError(
+                "forcing a service update cannot be run on a remote node"
+            )
+
         cmd = ["docker", "stack", "services", "-q", stack_name]
         result = run_cmd(cmd, capture_output=True, text=True)
         service_ids: List[str] = result.stdout.splitlines()
@@ -300,7 +311,8 @@ def swarm_init(
 main.add_command(swarm_init)
 
 
-@swarm.command("join")
+# BUG: this command wasn't working, so I've disabled it.
+# @swarm.command("join")
 @click.argument("node", type=str)
 @click.argument("stack_name", type=str)
 @_infile_option
@@ -337,7 +349,8 @@ def swarm_join(stack_name: str, infile: TextIO, node: str, token):
     assert d_client.swarm.join(join_token=token, **kwargs)
 
 
-main.add_command(swarm_join)
+# BUG: I've disabled this command, see above
+# main.add_command(swarm_join)
 
 
 @swarm.command("update")

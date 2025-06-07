@@ -1,8 +1,7 @@
-TODO.md
-clustered_5s.toml
-clustered_5s_schema.json
-clustered_5s.yaml
-compose.yaml
+# SPDX-FileCopyrightText: 2025 2025
+# SPDX-FileContributor: Nathan Fritzler
+#
+# SPDX-License-Identifier: MIT
 
 # python stuff
 __pycache__/

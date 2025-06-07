@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 2025
+# SPDX-FileContributor: Nathan Fritzler
+#
+# SPDX-License-Identifier: MIT
+
 import jq
 
 from .schemas import (
@@ -22,14 +27,6 @@ _categories = (
     "networks",
     "services",
 )
-
-
-def satisfy_nodes(config: Config) -> ConfigNodes:
-    return config.nodes or ConfigNodes({})
-
-
-def satisfy_plugins(config: Config) -> ConfigPlugins:
-    return config.plugins or ConfigPlugins({})
 
 
 def satisfy_jq_pools(config: Config, stack_name: str) -> ConfigStack:
@@ -70,7 +67,7 @@ def satisfy_config(
     stack = satisfy_jq_pools(config, stack_name)
     config.stacks[stack_name] = stack
 
-    nodes = satisfy_nodes(config)
+    nodes = config.nodes or ConfigNodes({})
     swarm = config.swarm
-    plugins = satisfy_plugins(config)
+    plugins = config.plugins or ConfigPlugins({})
     return config, nodes, swarm, plugins, stack

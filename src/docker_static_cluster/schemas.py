@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 2025
+# SPDX-FileContributor: Nathan Fritzler
+#
+# SPDX-License-Identifier: MIT
+
 import sys
 from typing import (
     ItemsView,

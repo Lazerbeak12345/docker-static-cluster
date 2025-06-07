@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import os
-from typing import Dict, TextIO, Optional
+from typing import Dict, List, TextIO, Optional
 import json
 import subprocess
 import shlex
@@ -29,6 +29,12 @@ debug = True
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 # TODO: automatic swarm state backup
+
+
+def run_cmd(args: List[str], **kwargs):
+    click.echo(f"\n$ {shlex.join(args)}\n")
+    # TODO: exit on subprocess errors, by default
+    return subprocess.run(args, **kwargs)
 
 
 @click.group()
@@ -99,6 +105,7 @@ def generate_compose_schema(output: TextIO):
 @click.option("--skip-nodes", is_flag=True)
 @click.option("--skip-propagate-config", is_flag=True)
 @click.option("--skip-stack-deploy", is_flag=True)
+@click.option("--force-service-update", is_flag=True)
 @click.argument("stack_name", type=str)
 @click.pass_context
 def deploy(
@@ -111,6 +118,7 @@ def deploy(
     skip_nodes: bool,
     skip_propagate_config: bool,
     skip_stack_deploy: bool,
+    force_service_update: bool,
     stack_name: str,
 ):
     """Deploy the config file."""
@@ -178,26 +186,59 @@ def deploy(
                 stack_name=stack_name,
             )
     if not skip_stack_deploy:
+        # TODO prune
+
         # stack_settings = stacks_settings[stack_name]
         if as_remote_node:
             # TODO: support ssh
             click.echo("Stack commands cannot be run on a remote node")
             sys.exit(1)
-        cmd = ["docker", "stack", "deploy"]
+        # NOTE: below doesn't do things the right way
+        #
+        # cmd = ["docker"]
+        #
+        # this instead adds behavior expected from docker stack,
+        #  alike that of docker compose
+        # TODO: this is python code, but they don't provide a python API
+        cmd = ["docker-sdp"]
 
+        cmd.extend(["stack", "deploy"])
         cmd.append(stack_name)
+        cmd.extend(["--compose-file", compose_file.name])
 
-        cmd.append("--compose-file")
-        cmd.append(compose_file.name)
+        run_cmd(cmd)
+    if force_service_update:
+        cmd = ["docker", "stack", "services", "-q", stack_name]
+        result = run_cmd(cmd, capture_output=True, text=True)
+        service_ids: List[str] = result.stdout.splitlines()
 
-        # TODO prune
+        click.echo("\n".join(service_ids))
 
-        click.echo(f"\n$ {shlex.join(cmd)}\n")
-        subprocess.run(cmd)
+        for service_id in service_ids:
+            cmd = ["docker", "service", "update"]
+            cmd.append("--force")
+            cmd.append(service_id)
 
+            run_cmd(cmd)
+
+
+# TODO: make these into commands
+#
+# TIP: if you're looking for a way to force-restart stuff,
+#
+#     docker stack services -q $stack | xargs -rt -n1 -- docker service update --force
+#
+# from https://stackoverflow.com/a/71724439/6353323
+#
+# can recreate everything
+#
+#     docker service update --force $service
+#
+# from https://stackoverflow.com/a/44110795/6353323
+#
+# will just update the unchanged
 
 # TODO: join swarm command
-# TODO: new swarm command
 
 
 @main.group()
@@ -363,18 +404,23 @@ def node_update(stack_name: str, infile: TextIO, node):
     config = injest_config(infile)
     config, nodes, _, _, _ = satisfy_config(config, stack_name)
 
+    rm = node not in nodes
+    rm_force = False
+
     d_client = docker.from_env()
     try:
         d_node = d_client.nodes.get(node)
     except docker.errors.APIError as e:
         if e.status_code == 404:
-            click.echo(f"node {node} was already removed")
-            return
+            if rm:
+                click.echo(f"node {node} was already removed")
+                return
+            else:
+                click.echo(f"node {node} needs to join the swarm")
+                # TODO: do this automatically
+                raise NotImplementedError(f"can't yet auto-join node {node}") from e
         else:
             raise e
-
-    rm = node not in nodes
-    rm_force = False
 
     if not rm:
         node_settings: ConfigNode = nodes[node]

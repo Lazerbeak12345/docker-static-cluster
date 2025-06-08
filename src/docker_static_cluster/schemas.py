@@ -231,11 +231,11 @@ class ConfigJQPools(
 class ConfigStack(BaseModel):
     # our additions
     #  Use this for making swarms
-    jq_pools: Optional[ConfigJQPools] = ConfigJQPools.model_validate({})
+    jq_pools: ConfigJQPools = ConfigJQPools.model_validate({})
     # overridden
-    volumes: Optional[ConfigVolumes] = ConfigVolumes.model_validate({})
-    networks: Optional[ConfigNetworks] = ConfigNetworks.model_validate({})
-    services: Optional[ConfigServices] = ConfigServices.model_validate({})
+    volumes: ConfigVolumes = ConfigVolumes.model_validate({})
+    networks: ConfigNetworks = ConfigNetworks.model_validate({})
+    services: ConfigServices = ConfigServices.model_validate({})
     # upstream
     model_config = ConfigDict(extra="allow")
 

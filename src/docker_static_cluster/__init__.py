@@ -24,6 +24,7 @@ from .schemas import (
     ConfigNodeSpec,
     ConfigNodes,
     ConfigPlugins,
+    ConfigServices,
     ConfigStack,
     ConfigSwarm,
     injest_config,
@@ -37,10 +38,12 @@ debug = True
 # TODO: automatic swarm state backup
 
 
-def run_cmd(args: List[str], **kwargs):
+def run_cmd(args: List[str], check=True, **kwargs):
     click.echo(f"\n$ {shlex.join(args)}\n")
-    # TODO: exit on subprocess errors, by default
-    return subprocess.run(args, **kwargs)
+    try:
+        return subprocess.run(args, check=check, **kwargs)
+    except subprocess.CalledProcessError as e:
+        sys.exit(e.returncode)
 
 
 @click.group()
@@ -128,15 +131,19 @@ def deploy(
     stack_name: str,
 ):
     """Deploy the config file."""
-    _, nodes_settings, swarm_settings, plugins_settings, _ = ctx.invoke(
+    config, nodes_settings, swarm_settings, plugins_settings, _ = ctx.invoke(
         generate_compose,
         stack_name=stack_name,
         infile=infile,
         compose_file=compose_file,
     )
+    assert isinstance(config, Config)
     assert isinstance(nodes_settings, ConfigNodes)
     assert isinstance(swarm_settings, ConfigSwarm)
     assert isinstance(plugins_settings, ConfigPlugins)
+
+    stacks_settings = config.stacks
+    stack_settings = stacks_settings[stack_name]
 
     # TODO: something was ignoring unsupported "restart" option
 
@@ -219,16 +226,13 @@ def deploy(
                 "forcing a service update cannot be run on a remote node"
             )
 
-        cmd = ["docker", "stack", "services", "-q", stack_name]
-        result = run_cmd(cmd, capture_output=True, text=True)
-        service_ids: List[str] = result.stdout.splitlines()
+        services_settings: ConfigServices = stack_settings.services
+        services_settings_d = services_settings.model_dump()
 
-        click.echo("\n".join(service_ids))
-
-        for service_id in service_ids:
+        for service_name in services_settings_d.keys():
             cmd = ["docker", "service", "update"]
             cmd.append("--force")
-            cmd.append(service_id)
+            cmd.append(f"{stack_name}_{service_name}")
 
             run_cmd(cmd)
 

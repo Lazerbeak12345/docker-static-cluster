@@ -32,7 +32,7 @@ from .schemas import (
 )
 from .cantgetno import satisfy_config
 
-debug = True
+debug = False
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 # TODO: automatic swarm state backup
@@ -92,8 +92,6 @@ def generate_compose(
     config = injest_config(infile)
     config, nodes, swarm, plugins, stack = satisfy_config(config, stack_name)
     stack_d = stack.model_dump()
-    for key in ("jq_pools",):
-        stack_d.pop(key)
     yaml.dump(stack_d, compose_file)
     return config, nodes, swarm, plugins, stack
 
@@ -131,19 +129,18 @@ def deploy(
     stack_name: str,
 ):
     """Deploy the config file."""
-    config, nodes_settings, swarm_settings, plugins_settings, _ = ctx.invoke(
-        generate_compose,
-        stack_name=stack_name,
-        infile=infile,
-        compose_file=compose_file,
+    config, nodes_settings, swarm_settings, plugins_settings, stack_settings = (
+        ctx.invoke(
+            generate_compose,
+            stack_name=stack_name,
+            infile=infile,
+            compose_file=compose_file,
+        )
     )
     assert isinstance(config, Config)
     assert isinstance(nodes_settings, ConfigNodes)
     assert isinstance(swarm_settings, ConfigSwarm)
     assert isinstance(plugins_settings, ConfigPlugins)
-
-    stacks_settings = config.stacks
-    stack_settings = stacks_settings[stack_name]
 
     # TODO: something was ignoring unsupported "restart" option
 
@@ -284,18 +281,17 @@ _swarm_init_keys = (
 
 @swarm.command("init")
 # @click.argument("node", type=str)
-@click.argument("stack_name", type=str)
 @_infile_option
 # @click.pass_context
 @click.option("--force-new-cluster", is_flag=True)
 def swarm_init(
     infile: TextIO,
-    stack_name: str,
     force_new_cluster: bool,  # , node: str
 ):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
-    config, _, swarm_settings, _, _ = satisfy_config(config, stack_name)
+
+    swarm_settings = config.swarm_settings
 
     d_client = docker.from_env()
 
@@ -308,8 +304,6 @@ def swarm_init(
             kwargs[key] = swarm_settings_d[key]
 
     click.echo(d_client.swarm.init(force_new_cluster=force_new_cluster, **kwargs))
-
-    # ctx.invoke(swarm_join, node=node, stack_name=stack_name)
 
 
 main.add_command(swarm_init)
@@ -461,34 +455,38 @@ def node_update(stack_name: str, infile: TextIO, node):
 
 
 def handle_ecxeption(exc_type, exc_value, exc_traceback):
+    import yaml.parser
+    # TODO: put this to stderr
+    click.echo(f"{exc_type.__name__} {exc_type}")
+    click.echo()
     try:
         raise exc_value
     except docker.errors.APIError as e:
-        # TODO: put this to stderr
-        click.echo(f"APIError {type(e).__name__}")
         if debug:
             click.echo(traceback.format_exc())
             click.echo()
-        click.echo(
-            json.dumps(
-                {
-                    "is_client_error": e.is_client_error(),
-                    "is_error": e.is_error(),
-                    "is_server_error": e.is_server_error(),
-                    "status_code": e.status_code,
-                    "strerror": e.strerror,
-                    "errno": e.errno,
-                    "filename": e.filename,
-                    "filename2": e.filename2,
-                }
+            click.echo(
+                json.dumps(
+                    {
+                        "is_client_error": e.is_client_error(),
+                        "is_error": e.is_error(),
+                        "is_server_error": e.is_server_error(),
+                        "status_code": e.status_code,
+                        "strerror": e.strerror,
+                        "errno": e.errno,
+                        "filename": e.filename,
+                        "filename2": e.filename2,
+                    }
+                )
             )
-        )
-        click.echo()
-        click.echo(e)
-    except docker.errors.DockerException as e:
-        """ Base class for docker-py exc. """
-        # TODO: put this to stderr
-        click.echo("DockerException")
+            click.echo()
+            click.echo(e)
+            click.echo()
+        click.echo(e.explanation)
+    except Exception as e:
+        if debug:
+            click.echo(traceback.format_exc())
+            click.echo()
         click.echo(e)
 
 

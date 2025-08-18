@@ -3,8 +3,10 @@
 #
 # SPDX-License-Identifier: MIT
 
+from pathlib import Path
 import sys
 from typing import (
+    Annotated,
     ItemsView,
     Iterator,
     KeysView,
@@ -16,6 +18,7 @@ from typing import (
     Optional,
     Generic,
     TypeVar,
+    cast,
 )
 
 if sys.version_info >= (3, 11):
@@ -25,7 +28,7 @@ else:
 
 import click
 import yaml
-from pydantic import BaseModel, ConfigDict, RootModel, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, FilePath, PlainSerializer, RootModel, ValidationError, model_serializer
 
 jqlang_schema = str
 
@@ -69,36 +72,11 @@ class DictLikeMixin(Generic[K, V]):
     def get(self, key: K, default: Optional[V] = None) -> Optional[V]:
         return self.root.get(key, default)
 
-
-class ConfigVolume(BaseModel):
-    # our additions
-    # stack: Optional[str] = None
-    # upstream
-    model_config = ConfigDict(extra="allow")
-
-
-class ConfigVolumes(
-    DictLikeMixin[str, ConfigVolume], RootModel[Dict[str, ConfigVolume]]
-):
-    pass
-
-
-class ConfigNetwork(BaseModel):
-    # our additions
-    # stack: Optional[str] = None
-    # upstream
-    model_config = ConfigDict(extra="allow")
-
-
-class ConfigNetworks(
-    DictLikeMixin[str, ConfigNetwork], RootModel[Dict[str, ConfigNetwork]]
-):
-    pass
+FilePathStr = Annotated[FilePath, PlainSerializer(lambda p: str(p), return_type=str)]
 
 
 class ConfigService(BaseModel):
     # our additions
-    # stack: Optional[str] = None
     # upstream
     model_config = ConfigDict(extra="allow")
 
@@ -210,52 +188,67 @@ class ConfigPlugins(
     pass
 
 
-class ConfigJQPool(BaseModel):
-    # mine
-    plugins: Optional[jqlang_schema] = None
-    swarm: Optional[jqlang_schema] = None
-    nodes: Optional[jqlang_schema] = None
-    # stacks: Optional[jqlang_schema] = None
-    # upstream
-    volumes: Optional[jqlang_schema] = None
-    networks: Optional[jqlang_schema] = None
-    services: Optional[jqlang_schema] = None
-
-
-class ConfigJQPools(
-    DictLikeMixin[str, ConfigJQPool], RootModel[Dict[str, ConfigJQPool]]
+class ConfigPluginBundles(
+    DictLikeMixin[str, ConfigPlugins], RootModel[Dict[str, ConfigPlugins]]
 ):
-    """jqlang queries on the config file that get appended to each config"""
+    pass
+
+
+class ConfigStackExt(BaseModel):
+    jq: Optional[str] = None
 
 
 class ConfigStack(BaseModel):
     # our additions
-    #  Use this for making swarms
-    jq_pools: ConfigJQPools = ConfigJQPools.model_validate({})
+    dsc: Optional[ConfigStackExt] = Field(alias="x-dsc", default=None, exclude=True)
     # overridden
-    volumes: ConfigVolumes = ConfigVolumes.model_validate({})
-    networks: ConfigNetworks = ConfigNetworks.model_validate({})
-    services: ConfigServices = ConfigServices.model_validate({})
     # upstream
+    version: Literal[
+        # Since we are still passing this to docker-compose (for now), we are still limited to v3. in the future we will not need to allow-list these.
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-3
+        "3",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-31
+        "3.1",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-32
+        "3.2",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-33
+        "3.3",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-34
+        "3.4",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-35
+        "3.5",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-36
+        "3.6",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-36
+        "3.6",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-37
+        "3.7",
+        # https://github.com/docker/compose/blob/v1/docs/Compose%20file%20reference%20(legacy)/compose-versioning.md#version-38
+        "3.8",
+    ]
+    services: ConfigServices
     model_config = ConfigDict(extra="allow")
 
 
-class ConfigStacks(DictLikeMixin[str, ConfigStack], RootModel[Dict[str, ConfigStack]]):
+class ConfigStackInfo(BaseModel):
+    stack: ConfigStack | FilePathStr
+    plugins: Optional[ConfigPlugins] = None
+
+
+class ConfigStacks(
+    DictLikeMixin[str, ConfigStackInfo],
+    RootModel[Dict[str, ConfigStackInfo]],
+):
     pass
 
 
 class Config(BaseModel):
-    # our additions
-    #  Docker plugin settings
-    plugins: Optional[ConfigPlugins] = None
-    #  swarm mode settings (based on commands under docker swarm)
-    swarm: ConfigSwarm
-    #  A docker swarm mode node
-    nodes: Optional[ConfigNodes] = None
     #  Corresponds to docker stack ls
     stacks: ConfigStacks = ConfigStacks.model_validate({})
-    # overridden
-    # upstream
+    #  swarm mode settings (based on commands under docker swarm)
+    swarm_settings: ConfigSwarm
+    #  A docker swarm mode node
+    swarm_nodes: Optional[ConfigNodes] = None
 
 
 def injest_config(config_file) -> Config:

@@ -28,7 +28,7 @@ else:
 
 import click
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, FilePath, PlainSerializer, RootModel, ValidationError, model_serializer
+from pydantic import BaseModel, ConfigDict, Field, FilePath, PlainSerializer, RootModel, ValidationError
 
 jqlang_schema = str
 

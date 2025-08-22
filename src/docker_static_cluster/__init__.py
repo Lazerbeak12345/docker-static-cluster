@@ -32,13 +32,13 @@ from .schemas import (
 )
 from .cantgetno import satisfy_config
 
-debug = False
+debug = True
 
 # TODO: https://click.palletsprojects.com/en/stable/shell-completion/
 # TODO: automatic swarm state backup
 
 
-def run_cmd(args: List[str], check=True, **kwargs):
+def run_cmd(args: List[str], check=True, **kwargs) -> subprocess.CompletedProcess:
     click.echo(f"\n$ {shlex.join(args)}\n")
     try:
         return subprocess.run(args, check=check, **kwargs)
@@ -107,6 +107,7 @@ def generate_compose_schema(output: TextIO):
 @_infile_option
 @_composefile_option
 @_as_remote_node_option
+@click.option("--detach", type=bool, default=None)
 @click.option("--skip-swarm", is_flag=True)
 @click.option("--skip-plugins", is_flag=True)
 @click.option("--skip-nodes", is_flag=True)
@@ -127,6 +128,7 @@ def deploy(
     skip_stack_deploy: bool,
     force_service_update: bool,
     stack_name: str,
+    detach: bool,
 ):
     """Deploy the config file."""
     config, nodes_settings, swarm_settings, plugins_settings, stack_settings = (
@@ -214,6 +216,8 @@ def deploy(
         cmd.extend(["stack", "deploy"])
         cmd.append(stack_name)
         cmd.extend(["--compose-file", compose_file.name])
+        if detach is not None:
+            cmd.append(f"--detach={'true' if detach else 'false'}")
 
         run_cmd(cmd)
     if force_service_update:
@@ -456,6 +460,7 @@ def node_update(stack_name: str, infile: TextIO, node):
 
 def handle_ecxeption(exc_type, exc_value, exc_traceback):
     import yaml.parser
+
     # TODO: put this to stderr
     click.echo(f"{exc_type.__name__} {exc_type}")
     click.echo()

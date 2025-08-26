@@ -20,8 +20,10 @@ import docker.errors
 
 from .schemas import (
     ConfigNode,
+    ConfigNodeManagerStatus,
     ConfigNodeRMSpec,
     ConfigNodeSpec,
+    ConfigNodeStatus,
     ConfigNodes,
     ConfigPlugins,
     ConfigServices,
@@ -284,28 +286,37 @@ _swarm_init_keys = (
 
 
 @swarm.command("init")
-# @click.argument("node", type=str)
 @_infile_option
-# @click.pass_context
 @click.option("--force-new-cluster", is_flag=True)
+@click.argument("node_name", type=str)
 def swarm_init(
     infile: TextIO,
-    force_new_cluster: bool,  # , node: str
+    force_new_cluster: bool,
+    node_name: str,
 ):
     """wrapper for docker swarm init"""
     config = injest_config(infile)
 
     swarm_settings = config.swarm_settings
+    swarm_nodes = config.swarm_nodes
+    assert swarm_nodes, "There are no nodes defined!"
+    the_node: ConfigNode = swarm_nodes[node_name]
 
     d_client = docker.from_env()
 
     kwargs = {}
 
     swarm_settings_d = swarm_settings.model_dump()
-
     for key in _swarm_init_keys:
         if key in swarm_settings_d:
             kwargs[key] = swarm_settings_d[key]
+
+    if the_node.Status and the_node.Status.Addr:
+        kwargs["advertise_addr"] = the_node.Status.Addr
+    if the_node.ManagerStatus and the_node.ManagerStatus.Addr:
+        kwargs["listen_addr"] = the_node.ManagerStatus.Addr
+    if the_node.DataPathAddr:
+        kwargs["data_path_addr"] = the_node.DataPathAddr
 
     click.echo(d_client.swarm.init(force_new_cluster=force_new_cluster, **kwargs))
 
